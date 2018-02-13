@@ -55,6 +55,8 @@ for device_name, info in devices.items():
     if info['port'] != '':
         info['device'] = info['device'](info['port'], debug=debug)
 
+    if device_name == 'vreg':
+        info['device'] = info['device'](debug=debug)
 
 # check that all devices were found & _initialized
 for device_name, info in devices.iteritems():
@@ -90,8 +92,8 @@ def poll():
 
     return ' '.join([str(val) for val in values])
 
-def vset():
-    pass
+def vset(arg):
+    devices['vreg']['device'].add_command_to_queue(arg)
 
 def hmove():
     pass

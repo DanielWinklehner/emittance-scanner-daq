@@ -14,9 +14,11 @@ class Vreg():
 
         # server will put commands to be issued in this queue object
         self._command_queue = Queue.Queue()
-        self._task = nidaqmx.Task()
-        self._task.ao_channels.add_ao_voltage_chan("Dev1/ao0")
-        self._task.ai_channels.add_ai_voltage_chan("Dev1/ai0")
+        self._write_task = nidaqmx.Task()
+        self._read_task = nidaqmx.Task()
+
+        self._write_task.ao_channels.add_ao_voltage_chan("Dev1/ao0")
+        self._read_task.ai_channels.add_ai_voltage_chan("Dev1/ai0")
 
     @property
     def current_value(self):
@@ -26,9 +28,11 @@ class Vreg():
         chars = msg.split()
         if chars[0] == 'vset':
             volt = float(chars[1])
+            # make sure we don't set the voltage too high or low
+            volt = max(min(10.0, volt), -10.0)
             if self._debug:
                 print(volt)
-        self._task.write(volt, auto_start = True)
+        self._write_task.write(volt, auto_start = True)
 
     def run(self):
         while not self._terminate:
@@ -42,7 +46,7 @@ class Vreg():
                 # call this because stepper echoes each command
                 continue
 
-            self._current_value = self._task.read()
+            self._current_value = self._read_task.read()
 
     def add_command_to_queue(self, cmd):
         self._command_queue.put(cmd)
