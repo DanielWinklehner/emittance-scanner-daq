@@ -9,7 +9,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1017</width>
+    <width>1047</width>
     <height>638</height>
    </rect>
   </property>
@@ -678,6 +678,9 @@
             <layout class="QHBoxLayout" name="horizontalLayout_33">
              <item>
               <widget class="QGroupBox" name="gbVCalib">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
                <property name="title">
                 <string>Vertical</string>
                </property>
@@ -1621,7 +1624,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1017</width>
+     <width>1047</width>
      <height>26</height>
     </rect>
    </property>
