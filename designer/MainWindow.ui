@@ -640,7 +640,7 @@
              <item>
               <widget class="QGroupBox" name="gbVCalib">
                <property name="title">
-                <string>Vertical (Not calibrated)</string>
+                <string>Vertical</string>
                </property>
                <layout class="QVBoxLayout" name="verticalLayout_9">
                 <item>
@@ -702,6 +702,13 @@
                   </property>
                  </widget>
                 </item>
+                <item>
+                 <widget class="QPushButton" name="btnVCalibReset">
+                  <property name="text">
+                   <string>Reset</string>
+                  </property>
+                 </widget>
+                </item>
                </layout>
               </widget>
              </item>
@@ -711,7 +718,7 @@
                 <bool>false</bool>
                </property>
                <property name="title">
-                <string>Horizontal (Not calibrated)</string>
+                <string>Horizontal</string>
                </property>
                <layout class="QVBoxLayout" name="verticalLayout_23">
                 <item>
@@ -770,6 +777,13 @@
                  <widget class="QLabel" name="lblHCalib">
                   <property name="text">
                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;1: -- mm = ###### Steps&lt;/p&gt;&lt;p&gt;2 : Not set&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QPushButton" name="btnHCalibReset">
+                  <property name="text">
+                   <string>Reset</string>
                   </property>
                  </widget>
                 </item>

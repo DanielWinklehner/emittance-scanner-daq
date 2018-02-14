@@ -27,10 +27,10 @@ s.listen(1)
 
 # device dict, default assignment to the respective class
 devices = {
-            'pico': {'device': Pico, 'serial': 'Controller', 'thread': None},
-            'vstepper': {'device': Stepper, 'serial': '8212017125346', 'thread': None},
-            'hstepper': {'device': Stepper, 'serial': 'aaa', 'thread': None},
-            'vreg': {'device': object, 'serial': 'aaa', 'thread': None}
+            'pico': {'device': Pico, 'serial': 'Controller', 'thread': None, 'port': 'COM6'},
+            'vstepper': {'device': Stepper, 'serial': '8212017125346', 'thread': None, 'port': 'COM5'},
+            'hstepper': {'device': Stepper, 'serial': 'aaa', 'thread': None, 'port': ''},
+            'vreg': {'device': object, 'serial': 'aaa', 'thread': None, 'port': ''}
 }
 
 '''

@@ -133,6 +133,12 @@ class DaqView():
         self._window.ui.btnHCalibSet.clicked.connect(self.set_hstepper_calibration)
         self._window.ui.btnVolCalibSet.clicked.connect(self.set_vreg_calibration)
 
+        self._window.ui.btnVCalibReset.clicked.connect(self.reset_vstepper_calibration)
+        self._window.ui.btnHCalibReset.clicked.connect(self.reset_hstepper_calibration)
+
+        # calibration radio buttons
+        self._window.ui.rbVCalibPt1.toggled.connect(self.on_v_calib_check_changed)
+
         # set up main device dictionary
         device_name_list = ['pico', 'vstepper', 'hstepper', 'vreg']
         self._devices = dict()
@@ -242,14 +248,24 @@ class DaqView():
     def on_poll_rate(self, rate):
         self._window.lblPollRate.setText('Polling rate: {0:.2f} Hz'.format(rate))
 
+    def calibrate(self, val, dev):
+        ''' Converts a value to a device's units based on its calibration '''
+        pt1 = dev['calibration'][0]
+        pt2 = dev['calibration'][1]
+
+        m = (pt2[1] - pt1[1]) / (pt2[0] - pt1[0])
+
+        return m * (val - pt1[0]) + pt1[1]
+
     def on_data(self, data):
+        ''' Updates devices when a message is received from the server '''
         data = data.decode("utf-8")
         cur, ver, hor, vol = [float(x) if x != 'ERR' \
                                 else 'ERR' for x in data.split(' ')]
 
         self._devices['pico']['value'] = cur
-        self._devices['vstepper']['value'] = ver if not self._vercalib else None
-        self._devices['hstepper']['value'] = ver if not self._vercalib else None
+        self._devices['vstepper']['value'] = ver if not self._vercalib else self.calibrate(ver, self._devices['vstepper'])
+        self._devices['hstepper']['value'] = hor if not self._horcalib else self.calibrate(hor, self._devices['hstepper'])
         self._devices['vreg']['value'] = vol
 
         for device_name, info in self._devices.items():
@@ -264,7 +280,7 @@ class DaqView():
         self.update_display_values()
 
     def update_display_values(self):
-
+        ''' Updates the GUI with the latest device values '''
         for device_name, info in self._devices.items():
             if info['hasErr']:
                 info['label'].setText('{0}: Error!'.format(info['name']))
@@ -318,12 +334,13 @@ class DaqView():
             self._comm._command_queue.put('vset {}'.format(vdest))
 
     def check_calibration(self):
+        ''' Determines if certain devices are calibrated or not '''
         # are both vertical points set?
         # python trickery to flatten a list of tuples
         if None not in list(sum(self._devices['vstepper']['calibration'], ())):
             self._devices['vstepper']['status'] = ''
             self._devices['vstepper']['unit'] = 'mm'
-            self._horcalib = True
+            self._vercalib = True
         else:
             self._devices['vstepper']['status'] = 'Not calibrated'
             self._devices['vstepper']['unit'] = 'steps'
@@ -351,22 +368,40 @@ class DaqView():
         idx = 0
         if self._window.ui.rbVCalibPt2.isChecked():
             idx = 1
+            self._window.ui.rbVCalibPt1.setChecked(True)
+        else:
+            self._window.ui.rbVCalibPt2.setChecked(True)
 
         self._devices['vstepper']['calibration'][idx] = \
                 (self._devices['vstepper']['value'], val)
 
         # replace the label text depending on which point is selected
-        msg = self._window.ui.lblVolCalib.text().split('\n')
-        msg[idx] = '{} mm = {} steps'.format(val, self._devices['vstepper']['value'])
-        self._window.ui.lblVolCalib.setText('\n'.join(msg))
+        msg = self._window.ui.lblVCalib.text().split('\n')
+        msg[idx] = '{} mm = {} steps'.format(int(val), int(self._devices['vstepper']['value']))
+        self._window.ui.lblVCalib.setText('\n'.join(msg))
 
+        self.check_calibration()
+
+    def reset_vstepper_calibration(self):
+        self._devices['vstepper']['calibration'] = [(None, None), (None, None)]
+        self._window.ui.lblVolCalib.setText('1. Not set\n2. Not set')
         self.check_calibration()
 
     def set_hstepper_calibration(self):
         pass
 
+    def reset_hstepper_calibration(self):
+        pass
+
     def set_vreg_calibration(self):
         pass
+
+    def on_v_calib_check_changed(self):
+        self._window.ui.txtVCalib.setText('')
+        if self._window.ui.rbVCalibPt1.isChecked():
+            pass
+        else:
+            pass
 
     def run(self):
         self._window.show()
