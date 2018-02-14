@@ -16,6 +16,11 @@ class MainWindow(QMainWindow):
 
         self.ui.lblServerMsg.hide()
 
+        # calibration page defaults
+        self.ui.lblVCalib.setText('1. Not set\n2. Not set')
+        self.ui.lblHCalib.setText('1. Not set\n2. Not set')
+        self.ui.lblVolCalib.setText('1. Not set\n2. Not set')
+
     def on_calib_rb_changed(self):
         if self.ui.rbVMove.isChecked():
             self.ui.gbVCalib.setEnabled(True)
@@ -47,7 +52,7 @@ class MainWindow(QMainWindow):
     @property
     def txtPort(self):
         return self.ui.txtPort
-    
+
     @property
     def lblServerMsg(self):
         return self.ui.lblServerMsg
@@ -59,15 +64,15 @@ class MainWindow(QMainWindow):
     @property
     def lblV(self):
         return self.ui.lblV
-    
+
     @property
     def lblVer(self):
         return self.ui.lblVerPos
-    
+
     @property
     def lblHor(self):
         return self.ui.lblHorPos
-    
+
     @property
     def lblCur(self):
         return self.ui.lblCur

@@ -129,10 +129,10 @@ class DaqView():
         self._window.ui.btnCalibMoveSet.clicked.connect(self.calib_move_set)
 
         # calibration buttons
-        self._window.ui.btnVExtend.clicked.connect(self.set_stepper_extended)
-        self._window.ui.btnVParked.clicked.connect(self.set_stepper_parked)
-        self._window.ui.btnHExtend.clicked.connect(self.set_stepper_extended)
-        self._window.ui.btnHParked.clicked.connect(self.set_stepper_parked)
+        #self._window.ui.btnVExtend.clicked.connect(self.set_stepper_extended)
+        #self._window.ui.btnVParked.clicked.connect(self.set_stepper_parked)
+        #self._window.ui.btnHExtend.clicked.connect(self.set_stepper_extended)
+        #self._window.ui.btnHParked.clicked.connect(self.set_stepper_parked)
 
 
         # set up main device dictionary
@@ -251,7 +251,7 @@ class DaqView():
                                 else 'ERR' for x in data.split(' ')]
 
         self._devices['pico']['value'] = cur
-        self._devices['vstepper']['value'] = ver if not self._vercalib else None 
+        self._devices['vstepper']['value'] = ver if not self._vercalib else None
         self._devices['hstepper']['value'] = ver if not self._vercalib else None
         self._devices['vreg']['value'] = vol
 
