@@ -33,6 +33,7 @@ devices = {
             'vreg': {'device': object, 'serial': 'aaa', 'thread': None}
 }
 
+'''
 # poll usb ports to associate devices
 proc = subprocess.Popen('/home/mist-1/Work/server/usb.sh', stdout=subprocess.PIPE, shell=True)
 output = proc.stdout.read().strip()
@@ -47,6 +48,12 @@ for line in output.split("\n"):
         if info['serial'] == serial_number:
             info['device'] = info['device'](port, debug=debug)
             break
+'''
+# TODO windows method hard-codes the ports... for now
+for device_name, info in devices.items():
+    if info['port'] != '':
+        info['device'] = info['device'](info['port'], debug=debug)
+
 
 # check that all devices were found & _initialized
 for device_name, info in devices.iteritems():
@@ -55,6 +62,7 @@ for device_name, info in devices.iteritems():
               'Serial number {} not found.'.format(
               device_name, info['serial']))
         #sys.exit(0)
+
 
 # set up devices
 for device_name, info in devices.iteritems():

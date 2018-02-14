@@ -129,18 +129,16 @@ class DaqView():
         self._window.ui.btnCalibMoveSet.clicked.connect(self.calib_move_set)
 
         # calibration buttons
-        #self._window.ui.btnVExtend.clicked.connect(self.set_stepper_extended)
-        #self._window.ui.btnVParked.clicked.connect(self.set_stepper_parked)
-        #self._window.ui.btnHExtend.clicked.connect(self.set_stepper_extended)
-        #self._window.ui.btnHParked.clicked.connect(self.set_stepper_parked)
-
+        self._window.ui.btnVCalibSet.clicked.connect(self.set_vstepper_calibration)
+        self._window.ui.btnHCalibSet.clicked.connect(self.set_hstepper_calibration)
+        self._window.ui.btnVolCalibSet.clicked.connect(self.set_vreg_calibration)
 
         # set up main device dictionary
         device_name_list = ['pico', 'vstepper', 'hstepper', 'vreg']
         self._devices = dict()
 
         for name in device_name_list:
-            self._devices[name] = {'value': 0.0,
+            self._devices[name] = {'value': 0.0, # real value returned from the server
                                    'deque': deque(maxlen=10),
                                    'hasErr': False,
                                    'label': None,
@@ -148,7 +146,8 @@ class DaqView():
                                    'unit': '',
                                    'status': '',
                                    'fmt': '{0:.2f}',
-                                   }
+                                   'calibration': [(None, None), (None, None)] # Linear interpolate between these points if set
+                                  }
 
         # manually assign labels & properties to each device
         self._devices['pico']['label'] = self._window.lblCur
@@ -174,8 +173,6 @@ class DaqView():
         # calibration variables
         self._vercalib = False
         self._horcalib = False
-        self._ver_calib_pts = (None, None)
-        self._hor_calib_pts = (None, None)
 
         self._com_thread = QThread()
 
@@ -322,38 +319,54 @@ class DaqView():
 
     def check_calibration(self):
         # are both vertical points set?
-        if self._ver_calib_pts != (None, None):
+        # python trickery to flatten a list of tuples
+        if None not in list(sum(self._devices['vstepper']['calibration'], ())):
             self._devices['vstepper']['status'] = ''
             self._devices['vstepper']['unit'] = 'mm'
+            self._horcalib = True
         else:
             self._devices['vstepper']['status'] = 'Not calibrated'
             self._devices['vstepper']['unit'] = 'steps'
             self._vercalib = False
 
         # same for horizontal points
-        if self._hor_calib_pts != (None, None):
+        if None not in list(sum(self._devices['hstepper']['calibration'], ())):
             self._devices['hstepper']['status'] = ''
             self._devices['hstepper']['unit'] = 'mm'
+            self._horcalib = True
         else:
             self._devices['hstepper']['status'] = 'Not calibrated'
             self._devices['hstepper']['unit'] = 'steps'
             self._horcalib = False
 
 
-    def set_stepper_extended(self):
-        ''' Sets the calibration points '''
-        if self._window.ui.rbVMove.isChecked():
-            self._ver_calib_pts[1] = self._devices['vstepper']['value']
-        else:
-            self._hor_calib_pts[1] = self._devices['vstepper']['value']
+    def set_vstepper_calibration(self):
+        # see if the user entered an Ok value
+        try:
+            val = float(self._window.ui.txtVCalib.text().strip())
+        except ValueError:
+            return
 
-    def set_stepper_parked(self):
-        ''' Sets the calibration points '''
-        if self._window.ui.rbVMove.isChecked():
-            self._ver_calib_pts[0] = self._devices['vstepper']['value']
-        else:
-            self._hor_calib_pts[0] = self._devices['vstepper']['value']
+        #is the user setting pt 1 or pt 2?
+        idx = 0
+        if self._window.ui.rbVCalibPt2.isChecked():
+            idx = 1
 
+        self._devices['vstepper']['calibration'][idx] = \
+                (self._devices['vstepper']['value'], val)
+
+        # replace the label text depending on which point is selected
+        msg = self._window.ui.lblVolCalib.text().split('\n')
+        msg[idx] = '{} mm = {} steps'.format(val, self._devices['vstepper']['value'])
+        self._window.ui.lblVolCalib.setText('\n'.join(msg))
+
+        self.check_calibration()
+
+    def set_hstepper_calibration(self):
+        pass
+
+    def set_vreg_calibration(self):
+        pass
 
     def run(self):
         self._window.show()
