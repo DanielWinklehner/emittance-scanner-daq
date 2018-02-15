@@ -139,6 +139,14 @@ class DaqView():
         # calibration radio buttons
         self._window.ui.rbVCalibPt1.toggled.connect(self.on_v_calib_check_changed)
 
+        # scan page textboxes all call the same checking function, so we do this
+        # with eval instead of writing out 12 separate lines
+        txtlist = ['txtVMinPos', 'txtVMaxPos', 'txtVStepPos', 'txtVMinV', 'txtVMaxV', 'txtVStepV',
+                   'txtHMinPos', 'txtHMaxPos', 'txtHStepPos', 'txtHMinV', 'txtHMaxV', 'txtHStepV']
+
+        for txt in txtlist:
+            eval('self._window.ui.{}.textChanged.connect(self.on_scan_textbox_change)'.format(txt))
+
         # set up main device dictionary
         device_name_list = ['pico', 'vstepper', 'hstepper', 'vreg']
         self._devices = dict()
@@ -425,6 +433,7 @@ class DaqView():
     def on_scan_textbox_change(self):
         ''' Function that calculates the number of scan points '''
         self._window.ui.lblScanPoints.setText('Total points: --')
+        self._window.ui.btnStartStopScan.setEnabled(False)
 
         v_points = 0
         h_points = 0
@@ -472,6 +481,16 @@ class DaqView():
         # if we made it here, then we can update the text box
         self._window.ui.lblScanPoints.setText(
                 'Total points: {}'.format(h_points + v_points))
+        self._window.ui.btnStartStopScan.setEnabled(True)
+
+    def scan(self):
+        pass
+        # calculate points to scan
+        # queue commands to be sent
+        # execute command
+        # wait for anticipated response
+        # record current for some time step & average
+        # move to next command
 
     def run(self):
         self._window.show()

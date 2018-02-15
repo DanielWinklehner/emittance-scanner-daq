@@ -1,0 +1,8 @@
+# creator files
+*.autosave
+
+# windows thumbnail files
+Thumbs.db
+
+# vim editor files
+.swp
