@@ -444,7 +444,7 @@
       </widget>
       <widget class="QWidget" name="tab">
        <property name="enabled">
-        <bool>true</bool>
+        <bool>false</bool>
        </property>
        <attribute name="title">
         <string>Calibration</string>
@@ -475,6 +475,19 @@
            <item>
             <layout class="QHBoxLayout" name="horizontalLayout">
              <item>
+              <spacer name="horizontalSpacer_27">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item>
               <widget class="QRadioButton" name="rbVMove">
                <property name="text">
                 <string>Vertical</string>
@@ -485,11 +498,37 @@
               </widget>
              </item>
              <item>
+              <spacer name="horizontalSpacer_29">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item>
               <widget class="QRadioButton" name="rbHMove">
                <property name="text">
                 <string>Horizontal</string>
                </property>
               </widget>
+             </item>
+             <item>
+              <spacer name="horizontalSpacer_28">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
              </item>
             </layout>
            </item>
@@ -688,7 +727,7 @@
                 <item>
                  <widget class="QPushButton" name="btnVCalibSet">
                   <property name="enabled">
-                   <bool>true</bool>
+                   <bool>false</bool>
                   </property>
                   <property name="text">
                    <string>Set</string>
@@ -811,7 +850,7 @@
         <item>
          <widget class="QGroupBox" name="groupBox_7">
           <property name="enabled">
-           <bool>true</bool>
+           <bool>false</bool>
           </property>
           <property name="title">
            <string>Voltage Regulator</string>
@@ -1113,21 +1152,21 @@
                     <item row="0" column="2">
                      <widget class="QLabel" name="label_26">
                       <property name="text">
-                       <string>cm</string>
+                       <string>mm</string>
                       </property>
                      </widget>
                     </item>
                     <item row="1" column="2">
                      <widget class="QLabel" name="label_27">
                       <property name="text">
-                       <string>cm</string>
+                       <string>mm</string>
                       </property>
                      </widget>
                     </item>
                     <item row="2" column="2">
                      <widget class="QLabel" name="label_28">
                       <property name="text">
-                       <string>cm</string>
+                       <string>mm</string>
                       </property>
                      </widget>
                     </item>
@@ -1256,21 +1295,21 @@
                     <item row="0" column="2">
                      <widget class="QLabel" name="label_29">
                       <property name="text">
-                       <string>cm</string>
+                       <string>mm</string>
                       </property>
                      </widget>
                     </item>
                     <item row="1" column="2">
                      <widget class="QLabel" name="label_30">
                       <property name="text">
-                       <string>cm</string>
+                       <string>mm</string>
                       </property>
                      </widget>
                     </item>
                     <item row="2" column="2">
                      <widget class="QLabel" name="label_31">
                       <property name="text">
-                       <string>cm</string>
+                       <string>mm</string>
                       </property>
                      </widget>
                     </item>
@@ -1351,7 +1390,7 @@
               </layout>
              </item>
              <item>
-              <widget class="QLabel" name="label_18">
+              <widget class="QLabel" name="lblScanPoints">
                <property name="font">
                 <font>
                  <family>MS Sans Serif</family>
@@ -1359,7 +1398,7 @@
                 </font>
                </property>
                <property name="text">
-                <string>Total points: 1000</string>
+                <string>Total points: --</string>
                </property>
               </widget>
              </item>
@@ -1372,7 +1411,7 @@
                 </font>
                </property>
                <property name="text">
-                <string>Output saved to /test/directory/file.csv</string>
+                <string>Output file not set</string>
                </property>
               </widget>
              </item>
@@ -1445,18 +1484,61 @@
           </property>
           <layout class="QVBoxLayout" name="verticalLayout_10">
            <item>
-            <widget class="QLabel" name="lblScanStatus">
-             <property name="minimumSize">
-              <size>
-               <width>300</width>
-               <height>300</height>
-              </size>
-             </property>
-             <property name="frameShape">
-              <enum>QFrame::Box</enum>
+            <widget class="QLabel" name="label_18">
+             <property name="styleSheet">
+              <string notr="true">font-weight: bold</string>
              </property>
              <property name="text">
-              <string/>
+              <string>Vertical</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="horizontalLayout_38">
+             <item>
+              <widget class="QLabel" name="label_45">
+               <property name="layoutDirection">
+                <enum>Qt::LeftToRight</enum>
+               </property>
+               <property name="styleSheet">
+                <string notr="true">font-style: italic</string>
+               </property>
+               <property name="text">
+                <string>V</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLabel" name="lblScanStatus">
+               <property name="minimumSize">
+                <size>
+                 <width>300</width>
+                 <height>300</height>
+                </size>
+               </property>
+               <property name="frameShape">
+                <enum>QFrame::Box</enum>
+               </property>
+               <property name="text">
+                <string/>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_44">
+             <property name="styleSheet">
+              <string notr="true">font-style: italic</string>
+             </property>
+             <property name="text">
+              <string>mm</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
              </property>
             </widget>
            </item>

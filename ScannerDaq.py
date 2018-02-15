@@ -264,8 +264,13 @@ class DaqView():
                                 else 'ERR' for x in data.split(' ')]
 
         self._devices['pico']['value'] = cur
-        self._devices['vstepper']['value'] = ver if not self._vercalib else self.calibrate(ver, self._devices['vstepper'])
-        self._devices['hstepper']['value'] = hor if not self._horcalib else self.calibrate(hor, self._devices['hstepper'])
+
+        # steppers must be calibrated before they can display values in mm
+        self._devices['vstepper']['value'] = ver if not self._vercalib else \
+                self.calibrate(ver, self._devices['vstepper'])
+        self._devices['hstepper']['value'] = hor if not self._horcalib else \
+                self.calibrate(hor, self._devices['hstepper'])
+
         self._devices['vreg']['value'] = vol
 
         for device_name, info in self._devices.items():
@@ -356,6 +361,16 @@ class DaqView():
             self._devices['hstepper']['unit'] = 'steps'
             self._horcalib = False
 
+        if self._vercalib or self._horcalib:
+            self._window.tabScan.setEnabled(True)
+
+            if not self._vercalib:
+                self._window.ui.rbVScan.setEnabled(False)
+                self._window.ui.rbHScan.setChecked(True)
+
+            if not self._horcalib:
+                self._window.ui.rbHScan.setEnabled(False)
+                self._window.ui.rbVScan.setChecked(True)
 
     def set_vstepper_calibration(self):
         # see if the user entered an Ok value
@@ -377,21 +392,24 @@ class DaqView():
 
         # replace the label text depending on which point is selected
         msg = self._window.ui.lblVCalib.text().split('\n')
-        msg[idx] = '{} mm = {} steps'.format(int(val), int(self._devices['vstepper']['value']))
+        msg[idx] = '{} mm = {} steps'.format(int(val),
+                int(self._devices['vstepper']['value']))
         self._window.ui.lblVCalib.setText('\n'.join(msg))
 
         self.check_calibration()
 
     def reset_vstepper_calibration(self):
         self._devices['vstepper']['calibration'] = [(None, None), (None, None)]
-        self._window.ui.lblVolCalib.setText('1. Not set\n2. Not set')
+        self._window.ui.lblVCalib.setText('1. Not set\n2. Not set')
         self.check_calibration()
 
     def set_hstepper_calibration(self):
         pass
 
     def reset_hstepper_calibration(self):
-        pass
+        self._devices['hstepper']['calibration'] = [(None, None), (None, None)]
+        self._window.ui.lblHCalib.setText('1. Not set\n2. Not set')
+        self.check_calibration()
 
     def set_vreg_calibration(self):
         pass
@@ -402,6 +420,58 @@ class DaqView():
             pass
         else:
             pass
+
+    # Scan page functions
+    def on_scan_textbox_change(self):
+        ''' Function that calculates the number of scan points '''
+        self._window.ui.lblScanPoints.setText('Total points: --')
+
+        v_points = 0
+        h_points = 0
+
+        # calculate number of vectical points
+        if self._window.ui.rbVScan.isChecked() or self._window.ui.rbBothScan.isChecked():
+            # try to parse user input for all vertical textboxes
+            try:
+                vmin = float(txtVMinPos.text())
+                vmax = float(txtVMaxPos.text())
+                vstep = float(txtVStepPos.text())
+                vminv = float(txtVMinV.text())
+                vmaxv = float(txtVMaxV.text())
+                vstepv = float(txtVStepV.text())
+            except ValueError:
+                return
+
+            # user input should be sequential
+            if (vmin > vmax) or (vminv > vmaxv):
+                return
+
+            # otherwise we can calculate the number of vertical points
+            v_points = len(np.arange(vmin, vmax, vstep)) * \
+                        len(np.arange(vminv, vmaxv, vstepv))
+
+        # calculate number of horizontal points
+        if self._window.ui.rbHScan.isChecked() or self._window.ui.rbBothScan.isChecked():
+            try:
+                hmin = float(txtHMinPos.text())
+                hmax = float(txtHMaxPos.text())
+                hstep = float(txtHStepPos.text())
+                hminv = float(txtHMinV.text())
+                hmaxv = float(txtHMaxV.text())
+                hstepv = float(txtHStepV.text())
+            except ValueError:
+                return
+
+            if (hmin > hmax) or (hminv > hmaxv):
+                return
+
+            # otherwise we can calculate the number of vertical points
+            h_points = len(np.arange(hmin, hmax, hstep)) * \
+                        len(np.arange(hminv, hmaxv, hstepv))
+
+        # if we made it here, then we can update the text box
+        self._window.ui.lblScanPoints.setText(
+                'Total points: {}'.format(h_points + v_points))
 
     def run(self):
         self._window.show()
