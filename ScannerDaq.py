@@ -258,11 +258,18 @@ class DaqView():
 
     def calibrate(self, val, dev):
         ''' Converts a value to a device's units based on its calibration '''
+        # python trickery to flatten a list of tuples
+        if None in list(sum(dev['calibration'], ())):
+            # if calibration not set, don't do anuthing
+            return val
+
         pt1 = dev['calibration'][0]
         pt2 = dev['calibration'][1]
 
+        # find slope
         m = (pt2[1] - pt1[1]) / (pt2[0] - pt1[0])
 
+        # return linear extrapolation
         return m * (val - pt1[0]) + pt1[1]
 
     def on_data(self, data):
@@ -272,13 +279,8 @@ class DaqView():
                                 else 'ERR' for x in data.split(' ')]
 
         self._devices['pico']['value'] = cur
-
-        # steppers must be calibrated before they can display values in mm
-        self._devices['vstepper']['value'] = ver if not self._vercalib else \
-                self.calibrate(ver, self._devices['vstepper'])
-        self._devices['hstepper']['value'] = hor if not self._horcalib else \
-                self.calibrate(hor, self._devices['hstepper'])
-
+        self._devices['vstepper']['value'] = ver
+        self._devices['hstepper']['value'] = hor
         self._devices['vreg']['value'] = vol
 
         for device_name, info in self._devices.items():
@@ -298,8 +300,11 @@ class DaqView():
             if info['hasErr']:
                 info['label'].setText('{0}: Error!'.format(info['name']))
             else:
+                # Device name: <value> <unit> <optional message>
                 info['label'].setText('{0}: {1} {2} {3}'.format(
-                        info['name'], info['fmt'].format(info['value']),
+                        info['name'], info['fmt'].format(
+                            self.calibrate(info['value'],
+                                self._devices[device_name])),
                         info['unit'], '(%s)' % (info['status']) if \
                             info['status'] != '' else ''
                     )
