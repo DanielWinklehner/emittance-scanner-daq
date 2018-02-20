@@ -139,6 +139,9 @@ class DaqView():
         # calibration radio buttons
         self._window.ui.rbVCalibPt1.toggled.connect(self.on_v_calib_check_changed)
 
+        # testing buttons
+        self._window.ui.btnVregTest.clicked.connect(self.test_vreg)
+
         # scan page textboxes all call the same checking function, so we do this
         # with eval instead of writing out 12 separate lines
         txtlist = ['txtVMinPos', 'txtVMaxPos', 'txtVStepPos', 'txtVMinV', 'txtVMaxV', 'txtVStepV',
@@ -191,6 +194,11 @@ class DaqView():
         self._com_thread = QThread()
 
         self.update_display_values()
+
+    def test_vreg(self):
+        val = np.random.normal(loc=0, scale=10)
+        self._comm.add_command_to_queue('vset vset {0:.2f}'.format(val))
+        print(val)
 
     def connect_to_server(self):
 

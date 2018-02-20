@@ -10,6 +10,7 @@ from inspect import isclass
 
 from devices.pico import Pico
 from devices.stepper import Stepper
+from devices.vreg import Vreg
 
 debug = False
 
@@ -30,7 +31,7 @@ devices = {
             'pico': {'device': Pico, 'serial': 'Controller', 'thread': None, 'port': 'COM6'},
             'vstepper': {'device': Stepper, 'serial': '8212017125346', 'thread': None, 'port': 'COM5'},
             'hstepper': {'device': Stepper, 'serial': 'aaa', 'thread': None, 'port': ''},
-            'vreg': {'device': object, 'serial': 'aaa', 'thread': None, 'port': ''}
+            'vreg': {'device': Vreg, 'serial': 'aaa', 'thread': None, 'port': ''}
 }
 
 '''
