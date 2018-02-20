@@ -197,7 +197,7 @@ class DaqView():
 
     def test_vreg(self):
         val = np.random.normal(loc=0, scale=10)
-        self._comm.add_command_to_queue('vset vset {0:.2f}'.format(val))
+        self._comm._command_queue.put('vset vset {0:.2f}'.format(val))
         print(val)
 
     def connect_to_server(self):
