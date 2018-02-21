@@ -8,4 +8,5 @@ Thumbs.db
 .swp
 
 # python compiled code
-# *.pyc
+*.pyc
+__pycache__

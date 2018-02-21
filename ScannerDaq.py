@@ -400,10 +400,17 @@ class DaqView():
             if not self._vercalib:
                 self._window.ui.rbVScan.setEnabled(False)
                 self._window.ui.rbHScan.setChecked(True)
+                self._window.ui.rbBothScan.setEnabled(False)
+                return
 
             if not self._horcalib:
                 self._window.ui.rbHScan.setEnabled(False)
                 self._window.ui.rbVScan.setChecked(True)
+                self._window.ui.rbBothScan.setEnabled(False)
+                return
+
+            # if both calibrated, we can do a 2-axis scan
+            self._window.ui.rbBothScan.setEnabled(True)
 
     def set_vstepper_calibration(self):
         # see if the user entered an Ok value
@@ -467,17 +474,17 @@ class DaqView():
         if self._window.ui.rbVScan.isChecked() or self._window.ui.rbBothScan.isChecked():
             # try to parse user input for all vertical textboxes
             try:
-                vmin = float(txtVMinPos.text())
-                vmax = float(txtVMaxPos.text())
-                vstep = float(txtVStepPos.text())
-                vminv = float(txtVMinV.text())
-                vmaxv = float(txtVMaxV.text())
-                vstepv = float(txtVStepV.text())
+                vmin = float(self._window.ui.txtVMinPos.text())
+                vmax = float(self._window.ui.txtVMaxPos.text())
+                vstep = float(self._window.ui.txtVStepPos.text())
+                vminv = float(self._window.ui.txtVMinV.text())
+                vmaxv = float(self._window.ui.txtVMaxV.text())
+                vstepv = float(self._window.ui.txtVStepV.text())
             except ValueError:
                 return
 
-            # user input should be sequential
-            if (vmin > vmax) or (vminv > vmaxv):
+            # user input should be sequential, and having a step of 0 will cause a divide by zero error
+            if (vmin > vmax) or (vminv > vmaxv) or vstep == 0 or vstepv == 0:
                 return
 
             # otherwise we can calculate the number of vertical points
@@ -487,16 +494,16 @@ class DaqView():
         # calculate number of horizontal points
         if self._window.ui.rbHScan.isChecked() or self._window.ui.rbBothScan.isChecked():
             try:
-                hmin = float(txtHMinPos.text())
-                hmax = float(txtHMaxPos.text())
-                hstep = float(txtHStepPos.text())
-                hminv = float(txtHMinV.text())
-                hmaxv = float(txtHMaxV.text())
-                hstepv = float(txtHStepV.text())
+                hmin = float(self._window.ui.txtHMinPos.text())
+                hmax = float(self._window.ui.txtHMaxPos.text())
+                hstep = float(self._window.ui.txtHStepPos.text())
+                hminv = float(self._window.ui.txtHMinV.text())
+                hmaxv = float(self._window.ui.txtHMaxV.text())
+                hstepv = float(self._window.ui.txtHStepV.text())
             except ValueError:
                 return
 
-            if (hmin > hmax) or (hminv > hmaxv):
+            if (hmin > hmax) or (hminv > hmaxv) or hstep == 0 or hstepv == 0:
                 return
 
             # otherwise we can calculate the number of vertical points
