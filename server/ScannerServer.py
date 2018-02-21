@@ -93,16 +93,37 @@ def poll():
     return ' '.join([str(val) for val in values])
 
 def vset(arg):
+    if isclass(devices['vreg']['device']):
+        print('Attempted to send command to offline device! (vreg)')
+        return
     devices['vreg']['device'].add_command_to_queue(arg)
 
-def hmove():
-    pass
+def hmove(arg):
+    if isclass(devices['hstepper']['device']):
+        print('Attempted to send command to offline device! (hstepper)')
+        return
+    devices['hstepper']['device'].add_command_to_queue(arg)
 
 def vmove(arg):
-    devices['vstepper']['device'].add_command_to_queue(arg) # absolute move
+    if isclass(devices['vstepper']['device']):
+        print('Attempted to send command to offline device! (vstepper)')
+        return
+    devices['vstepper']['device'].add_command_to_queue(arg)
 
-def move():
-    pass
+def move(v=None, h=None, vol=None):
+    ''' gui can send one command to move a stepper and set voltage '''
+    if v is not None and h is not None:
+        print('Attempted to move vertical and horizontal steppers at the same time!')
+        return
+
+    if vol is not None:
+        vset(vol)
+
+    if v is not None:
+        vmove(v)
+
+    if h is not None:
+        hmove(h)
 
 # mapping of received words to function calls
 fmap = {

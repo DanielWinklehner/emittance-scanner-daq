@@ -6,3 +6,6 @@ Thumbs.db
 
 # vim editor files
 .swp
+
+# python compiled code
+# *.pyc

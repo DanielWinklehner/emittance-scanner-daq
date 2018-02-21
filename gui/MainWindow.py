@@ -21,6 +21,10 @@ class MainWindow(QMainWindow):
         self.ui.lblHCalib.setText('1. Not set\n2. Not set')
         self.ui.lblVolCalib.setText('1. Not set\n2. Not set')
 
+        # disable calibration page manually (I don't know why I can't do this in Creator)
+        self.ui.tab.setEnabled(False)
+        self.ui.gbHCalib.setEnabled(False)
+
     def on_calib_rb_changed(self):
         if self.ui.rbVMove.isChecked():
             self.ui.gbVCalib.setEnabled(True)

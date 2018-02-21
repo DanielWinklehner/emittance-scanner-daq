@@ -444,7 +444,7 @@
       </widget>
       <widget class="QWidget" name="tab">
        <property name="enabled">
-        <bool>false</bool>
+        <bool>true</bool>
        </property>
        <attribute name="title">
         <string>Calibration</string>
@@ -679,7 +679,7 @@
              <item>
               <widget class="QGroupBox" name="gbVCalib">
                <property name="enabled">
-                <bool>false</bool>
+                <bool>true</bool>
                </property>
                <property name="title">
                 <string>Vertical</string>
@@ -730,7 +730,7 @@
                 <item>
                  <widget class="QPushButton" name="btnVCalibSet">
                   <property name="enabled">
-                   <bool>false</bool>
+                   <bool>true</bool>
                   </property>
                   <property name="text">
                    <string>Set</string>
@@ -757,7 +757,7 @@
              <item>
               <widget class="QGroupBox" name="gbHCalib">
                <property name="enabled">
-                <bool>false</bool>
+                <bool>true</bool>
                </property>
                <property name="title">
                 <string>Horizontal</string>
@@ -808,7 +808,7 @@
                 <item>
                  <widget class="QPushButton" name="btnHCalibSet">
                   <property name="enabled">
-                   <bool>false</bool>
+                   <bool>true</bool>
                   </property>
                   <property name="text">
                    <string>Set</string>
@@ -853,7 +853,7 @@
         <item>
          <widget class="QGroupBox" name="groupBox_7">
           <property name="enabled">
-           <bool>false</bool>
+           <bool>true</bool>
           </property>
           <property name="title">
            <string>Voltage Regulator</string>

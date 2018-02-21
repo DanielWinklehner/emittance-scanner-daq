@@ -20,8 +20,22 @@ from PyQt5.QtWidgets import QApplication, QFileDialog
 
 from gui import MainWindow
 
+
 class CouldNotConnectError(Exception):
     pass
+
+
+class Daq():
+    ''' Class for collecting and organizing data '''
+    def __init__(self):
+        pass
+
+    def save_data(self):
+        pass
+
+    def send_data(self):
+        pass
+
 
 class Comm(QObject):
 
@@ -113,10 +127,8 @@ class Comm(QObject):
     def terminate(self):
         self._terminate = True
 
-class DaqView():
 
-    #sig_connected = pyqtSignal()
-    #sig_disconnected = pyqtSignal()
+class DaqView():
 
     def __init__(self):
         self._window = MainWindow.MainWindow()
