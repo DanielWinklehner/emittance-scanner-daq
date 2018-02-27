@@ -16,7 +16,7 @@ debug = False
 
 TCP_IP = '0.0.0.0'
 TCP_PORT = 5000
-BUFFER_SIZE = 20  # Normally 1024, but we want fast response
+BUFFER_SIZE = 64  # Normally 1024, but we want fast response
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -110,20 +110,20 @@ def vmove(arg):
         return
     devices['vstepper']['device'].add_command_to_queue(arg)
 
-def move(v=None, h=None, vol=None):
+def set_devices(v=None, h=None, vol=None):
     ''' gui can send one command to move a stepper and set voltage '''
     if v is not None and h is not None:
         print('Attempted to move vertical and horizontal steppers at the same time!')
         return
 
     if vol is not None:
-        vset(vol)
+        vset('vset {}'.format(vol))
 
     if v is not None:
-        vmove(v)
+        vmove('MA {}'.format(v))
 
     if h is not None:
-        hmove(h)
+        hmove('MA {}'.format(h))
 
 # mapping of received words to function calls
 fmap = {
@@ -153,9 +153,21 @@ try:
             if tp == ['poll']:
                 # on poll request we immediately send the result
                 conn.send(fmap[tp[0]]())
-            else:
+            elif tp[0] != ['setall']:
+                # single arg commands
                 word, arg = tp
-                fmap[word](arg)
+                try:
+                    fmap[word](arg)
+                except KeyError:
+                    print('Did not understand message: {}'.format(word))
+                    pass
+            else:
+                word, args = tp
+                # should be exactly 3 words (2 splits) in the arg list
+                # convert the string None to python None
+                args = [None if arg == 'None' else arg \
+                        for arg in args.split(' ', 2)]
+                set_devices(*args)
 
         conn.close()
 except KeyboardInterrupt:
