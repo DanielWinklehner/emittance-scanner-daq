@@ -105,6 +105,32 @@ class Daq(QObject):
         epsilon = 1e-6
         return abs(val1 - val2) < epsilon
 
+    def safe_move(self, vtarget, htarget, voltarget):
+        ''' Sends set command and waits until devices have reached set point '''
+
+        stepper = 'vstepper' if  vtarget is not None else 'hstepper'
+
+        prev_val = self._devices[stepper]['value']
+        # stepper motor is traditionally slower so try that first
+        while not self.close_enough(self._devices[stepper]['value'], vtarget):
+            # server expects setall <v stepper value> <h stepper value> <vreg value>s
+            # only want to send command if we are stuck
+            if self._devices[stepper]['value'] == prev_val:
+                msg = 'setall {} {} {}'.format(vtarget, htarget, voltarget)
+                self.sig_msg.emit(msg)
+                time.sleep(0.1)
+
+        # now send some more commands if we are not at voltage target
+        if voltarget is None:
+            return
+
+        prev_val = self._devices['vreg']['value']
+        while not self.close_enough(self._devices['vreg']['value'], voltarget):
+            if self._devices['vreg']['value'] == prev_val:
+                msg = 'setall {} {} {}'.format(None, None, voltarget)
+                self.sig_msg.emit(msg)
+                time.sleep(0.1)
+
     def run(self):
         # do vertical scan
         if self._v_scan_pts != None:
@@ -113,46 +139,35 @@ class Daq(QObject):
             vtargetv = self._v_scan_pts[1][0]
             vsteps = len(self._v_scan_pts[1])
 
-            while self._devices['vstepper']['value'] != vtarget:
-                # server expects setall <v stepper value> <h stepper value> <vreg value>s
-                msg = 'setall {} {} {}'.format(vtarget, None, vtargetv)
-                self.sig_msg.emit(msg)
-                time.sleep(0.1)
+            self.safe_move(vtarget, None, vtargetv)
 
             time.sleep(1)
 
             # start scan
             for i, vtarget in enumerate(self._v_scan_pts[0]):
-                while not self.close_enough(self._devices['vstepper']['value'], vtarget):
-                    # server expects setall <v stepper value> <h stepper value> <vreg value>s
-                    msg = 'setall {} {} {}'.format(vtarget, None, None)
-                    self.sig_msg.emit(msg)
-                    time.sleep(0.1)
+                self.safe_move(vtarget, None, None)
 
-                # once we are at the target values, we find average current
+                # loop over voltages once we are at the correct position
                 for j, vtargetv in enumerate(self._v_scan_pts[1]):
-                    while not self.close_enough(self._devices['vreg']['value'], vtargetv):
-                        # server expects setall <v stepper value> <h stepper value> <vreg value>s
-                        msg = 'setall {} {} {}'.format(None, None, vtargetv)
-                        self.sig_msg.emit(msg)
-                        time.sleep(0.1)
+                    self.safe_move(vtarget, None, vtargetv)
 
+                    # once we are at the target values, we find average current
                     currents = []
                     for k in range(50):
                         currents.append(self._devices['pico']['value'])
                         time.sleep(0.001)
 
                     current = np.mean(currents)
-
                     self._vdata[i * vsteps + j]['i'] = current
-
                     self.sig_new_pt.emit()
 
         print(self._vdata)
+
+        # move stepper to parked position -- calibration point 1 is tuple with (steps, mm), use steps
+        vtarget = self._devices['vstepper']['calibration'][0][0]
+        self.safe_move(vtarget, None, None)
+
         self._terminate = True
-        # move stepper to parked position -- calibration point 2 is tuple with (steps, mm), use steps
-        msg = 'setall {} {} {}'.format(None, None, self._devices['vstepper']['calibration'][1][0])
-        self.sig_msg.emit(msg)
         self.sig_done.emit()
 
     @property
@@ -268,6 +283,68 @@ class Comm(QObject):
         self._terminate = True
 
 
+class DeviceManager(QObject):
+    ''' Class containing devices to be updated asynchronously from the gui '''
+    def __init__(self):
+        super().__init__()
+
+        device_name_list = ['pico', 'vstepper', 'hstepper', 'vreg']
+        self._devices = dict()
+
+        for name in device_name_list:
+            self._devices[name] = {'value': 0.0, # real value returned from the server
+                                   'type': float,
+                                   'deque': deque(maxlen=10),
+                                   'hasErr': False,
+                                   'label': None,
+                                   'name': '',
+                                   'unit': '',
+                                   'status': '',
+                                   'fmt': '{0:.2f}',
+                                   'calibration': [(None, None), (None, None)], # Linear interpolate between these points if set
+                                   'scan': None # holds list of sets of points to scan
+                                  }
+
+        self._devices['pico']['name'] = 'Current'
+        self._devices['vstepper']['name'] = 'Vertical'
+        self._devices['hstepper']['name'] = 'Horizontal'
+        self._devices['vreg']['name'] = 'Voltage'
+
+        self._devices['pico']['unit'] = 'A'
+        self._devices['vstepper']['unit'] = 'steps'
+        self._devices['hstepper']['unit'] = 'steps'
+        self._devices['vreg']['unit'] = 'kV'
+
+        # exceptions to default values
+        self._devices['pico']['fmt'] = '{0:.4e}'
+        self._devices['vstepper']['status'] = 'Not calibrated'
+        self._devices['hstepper']['status'] = 'Not calibrated'
+        self._devices['vstepper']['type'] = int
+        self._devices['hstepper']['type'] = int
+
+    def on_data(self, data):
+        data = data.decode("utf-8")
+        cur, ver, hor, vol = [float(x) if x != 'ERR' \
+                                else 'ERR' for x in data.split(' ')]
+
+        self._devices['pico']['value'] = cur
+        self._devices['vstepper']['value'] = ver
+        self._devices['hstepper']['value'] = hor
+        self._devices['vreg']['value'] = vol
+
+        for device_name, info in self._devices.items():
+            if info['value'] == 'ERR':
+                info['hasErr'] = True
+            else:
+                info['hasErr'] = False
+                info['deque'].append(
+                        info['value']
+                    )
+
+    @property
+    def devices(self):
+        return self._devices
+
 class DaqView():
 
     def __init__(self):
@@ -301,53 +378,26 @@ class DaqView():
         for txt in txtlist:
             eval('self._window.ui.{}.textChanged.connect(self.on_scan_textbox_change)'.format(txt))
 
-        # set up main device dictionary
-        device_name_list = ['pico', 'vstepper', 'hstepper', 'vreg']
-        self._devices = dict()
-
-        for name in device_name_list:
-            self._devices[name] = {'value': 0.0, # real value returned from the server
-                                   'type': float,
-                                   'deque': deque(maxlen=10),
-                                   'hasErr': False,
-                                   'label': None,
-                                   'name': '',
-                                   'unit': '',
-                                   'status': '',
-                                   'fmt': '{0:.2f}',
-                                   'calibration': [(None, None), (None, None)], # Linear interpolate between these points if set
-                                   'scan': None # holds list of sets of points to scan
-                                  }
-
-        # manually assign labels & properties to each device
-        self._devices['pico']['label'] = self._window.lblCur
-        self._devices['vstepper']['label'] = self._window.lblVer
-        self._devices['hstepper']['label'] = self._window.lblHor
-        self._devices['vreg']['label'] = self._window.lblV
-
-        self._devices['pico']['name'] = 'Current'
-        self._devices['vstepper']['name'] = 'Vertical'
-        self._devices['hstepper']['name'] = 'Horizontal'
-        self._devices['vreg']['name'] = 'Voltage'
-
-        self._devices['pico']['unit'] = 'A'
-        self._devices['vstepper']['unit'] = 'steps'
-        self._devices['hstepper']['unit'] = 'steps'
-        self._devices['vreg']['unit'] = 'kV'
-
-        # exceptions to default values
-        self._devices['pico']['fmt'] = '{0:.4e}'
-        self._devices['vstepper']['status'] = 'Not calibrated'
-        self._devices['hstepper']['status'] = 'Not calibrated'
-        self._devices['vstepper']['type'] = int
-        self._devices['hstepper']['type'] = int
-
         # calibration variables
         self._vercalib = False
         self._horcalib = False
 
+        # device manager class allows devices to be updated independent of the gui thread
+        self._dm = DeviceManager()
+
+        # manually assign labels & properties to each device
+        self._dm.devices['pico']['label'] = self._window.lblCur
+        self._dm.devices['vstepper']['label'] = self._window.lblVer
+        self._dm.devices['hstepper']['label'] = self._window.lblHor
+        self._dm.devices['vreg']['label'] = self._window.lblV
+
+
         self._com_thread = QThread()
         self._scan_thread = QThread()
+        self._dm_thread = QThread()
+
+        self._dm.moveToThread(self._dm_thread)
+        self._dm_thread.start()
 
         self.update_display_values()
 
@@ -385,7 +435,8 @@ class DaqView():
             return
 
         self._comm.sig_poll_rate.connect(self.on_poll_rate)
-        self._comm.sig_data.connect(self.on_data)
+        self._comm.sig_data.connect(self._dm.on_data)
+        self._comm.sig_data.connect(lambda x: self.update_display_values())
         self._comm.sig_done.connect(self.shutdown_communication)
         self._comm.moveToThread(self._com_thread)
         self._com_thread.started.connect(self._comm.poll)
@@ -425,6 +476,7 @@ class DaqView():
 
     def on_data(self, data):
         ''' Updates devices when a message is received from the server '''
+
         data = data.decode("utf-8")
         cur, ver, hor, vol = [float(x) if x != 'ERR' \
                                 else 'ERR' for x in data.split(' ')]
@@ -447,7 +499,7 @@ class DaqView():
 
     def update_display_values(self):
         ''' Updates the GUI with the latest device values '''
-        for device_name, info in self._devices.items():
+        for device_name, info in self._dm.devices.items():
             if info['hasErr']:
                 info['label'].setText('{0}: Error!'.format(info['name']))
             else:
@@ -455,7 +507,7 @@ class DaqView():
                 info['label'].setText('{0}: {1} {2} {3}'.format(
                         info['name'], info['fmt'].format(
                             calibrate(info['value'],
-                                self._devices[device_name])),
+                                self._dm.devices[device_name])),
                         info['unit'], '(%s)' % (info['status']) if \
                             info['status'] != '' else ''
                     )
@@ -476,23 +528,23 @@ class DaqView():
         ''' Determines if certain devices are calibrated or not '''
         # are both vertical points set?
         # python trickery to flatten a list of tuples
-        if None not in list(sum(self._devices['vstepper']['calibration'], ())):
-            self._devices['vstepper']['status'] = ''
-            self._devices['vstepper']['unit'] = 'mm'
+        if None not in list(sum(self._dm.devices['vstepper']['calibration'], ())):
+            self._dm.devices['vstepper']['status'] = ''
+            self._dm.devices['vstepper']['unit'] = 'mm'
             self._vercalib = True
         else:
-            self._devices['vstepper']['status'] = 'Not calibrated'
-            self._devices['vstepper']['unit'] = 'steps'
+            self._dm.devices['vstepper']['status'] = 'Not calibrated'
+            self._dm.devices['vstepper']['unit'] = 'steps'
             self._vercalib = False
 
         # same for horizontal points
-        if None not in list(sum(self._devices['hstepper']['calibration'], ())):
-            self._devices['hstepper']['status'] = ''
-            self._devices['hstepper']['unit'] = 'mm'
+        if None not in list(sum(self._dm.devices['hstepper']['calibration'], ())):
+            self._dm.devices['hstepper']['status'] = ''
+            self._dm.devices['hstepper']['unit'] = 'mm'
             self._horcalib = True
         else:
-            self._devices['hstepper']['status'] = 'Not calibrated'
-            self._devices['hstepper']['unit'] = 'steps'
+            self._dm.devices['hstepper']['status'] = 'Not calibrated'
+            self._dm.devices['hstepper']['unit'] = 'steps'
             self._horcalib = False
 
         if self._vercalib or self._horcalib:
@@ -570,31 +622,31 @@ class DaqView():
         upper_steps = None
 
         # extend stepper <=> move in negative direction
-        prev_pos = self._devices[stepper]['value']
+        prev_pos = self._dm.devices[stepper]['value']
         msg = prefix + 'SL - SP'
         self._comm._command_queue.put(msg)
         while not lower_set:
             time.sleep(waittime)
-            if self._devices[stepper]['value'] != prev_pos:
-                prev_pos = self._devices[stepper]['value']
+            if self._dm.devices[stepper]['value'] != prev_pos:
+                prev_pos = self._dm.devices[stepper]['value']
             else:
-                lower_steps = self._devices[stepper]['value']
+                lower_steps = self._dm.devices[stepper]['value']
                 lower_set = True
 
         # retract stepper <=> move in positive direction
-        prev_pos = self._devices[stepper]['value']
+        prev_pos = self._dm.devices[stepper]['value']
         msg = prefix + 'SL SP'
         self._comm._command_queue.put(msg)
         while not upper_set:
             time.sleep(waittime)
-            if self._devices[stepper]['value'] != prev_pos:
-                prev_pos = self._devices[stepper]['value']
+            if self._dm.devices[stepper]['value'] != prev_pos:
+                prev_pos = self._dm.devices[stepper]['value']
             else:
-                upper_steps = self._devices[stepper]['value']
+                upper_steps = self._dm.devices[stepper]['value']
                 upper_set = True
 
-        self._devices[stepper]['calibration'] = \
-            [(lower_steps, lower), (upper_steps, upper)]
+        self._dm.devices[stepper]['calibration'] = \
+            [(upper_steps, upper), (lower_steps, lower)]
 
         self.check_calibration()
         self._window.tabCalib.setEnabled(True)
@@ -629,9 +681,9 @@ class DaqView():
 
         v_points = 0
         h_points = 0
-        self._devices['vstepper']['scan'] = [None]
-        self._devices['hstepper']['scan'] = [None]
-        self._devices['vreg']['scan'] = [None, None]
+        self._dm.devices['vstepper']['scan'] = [None]
+        self._dm.devices['hstepper']['scan'] = [None]
+        self._dm.devices['vreg']['scan'] = [None, None]
 
         # calculate number of vectical points
         if self._window.ui.rbVScan.isChecked() or self._window.ui.rbBothScan.isChecked():
@@ -651,10 +703,10 @@ class DaqView():
                 return
 
             # otherwise we can calculate the vertical points
-            self._devices['vstepper']['scan'] = [calibrate(np.arange(vmin, vmax, vstep), self._devices['vstepper'], reverse=True)]
-            self._devices['vreg']['scan'][0] = calibrate(np.arange(vminv, vmaxv, vstepv), self._devices['vreg'], reverse=True)
-            v_points = len(self._devices['vstepper']['scan'][0]) * \
-                        len(self._devices['vreg']['scan'][0])
+            self._dm.devices['vstepper']['scan'] = [calibrate(np.arange(vmin, vmax, vstep), self._dm.devices['vstepper'], reverse=True)]
+            self._dm.devices['vreg']['scan'][0] = calibrate(np.arange(vminv, vmaxv, vstepv), self._dm.devices['vreg'], reverse=True)
+            v_points = len(self._dm.devices['vstepper']['scan'][0]) * \
+                        len(self._dm.devices['vreg']['scan'][0])
 
         # calculate number of horizontal points
         if self._window.ui.rbHScan.isChecked() or self._window.ui.rbBothScan.isChecked():
@@ -672,10 +724,10 @@ class DaqView():
                 return
 
             # otherwise we can calculate the number of vertical points
-            self._devices['hstepper']['scan'] = [calibrate(np.arange(hmin, hmax, hstep), self._devices['hstepper'], reverse=True)]
-            self._devices['vreg']['scan'][1] = calibrate(np.arange(hminv, hmaxv, hstepv), self._devices['vreg'], reverse=True)
-            v_points = len(self._devices['hstepper']['scan'][0]) * \
-                        len(self._devices['hreg']['scan'][1])
+            self._dm.devices['hstepper']['scan'] = [calibrate(np.arange(hmin, hmax, hstep), self._dm.devices['hstepper'], reverse=True)]
+            self._dm.devices['vreg']['scan'][1] = calibrate(np.arange(hminv, hmaxv, hstepv), self._dm.devices['vreg'], reverse=True)
+            v_points = len(self._dm.devices['hstepper']['scan'][0]) * \
+                        len(self._dm.devices['hreg']['scan'][1])
 
         # if we made it here, then we can update the text box
         self._window.ui.lblScanPoints.setText(
@@ -695,7 +747,7 @@ class DaqView():
         if self._window.ui.rbHScan.isChecked() or self._window.ui.rbBothScan.isChecked():
             pass
 
-        self._daq = Daq(self._devices)
+        self._daq = Daq(self._dm.devices)
         self._daq.sig_msg.connect(self.on_command_ready)
         self._daq.sig_done.connect(self.on_scan_finished)
         self._daq.sig_new_pt.connect(self.on_scan_pt)
@@ -705,14 +757,16 @@ class DaqView():
 
         # disable controls that could interfere with the scan
         self._window.tabCalib.setEnabled(False)
+        self._window.ui.gbSteppers.setEnabled(False)
 
     def on_scan_pt(self):
         ''' update the plot label when a new point comes in '''
         self._window.draw_scan_hist(self._daq.vdata)
 
     def on_scan_finished(self):
-        print('here')
         self._window.tabCalib.setEnabled(True)
+        self._window.ui.gbSteppers.setEnabled(True)
+
         del self._daq
         self._scan_thread = QThread()
 

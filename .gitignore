@@ -9,4 +9,4 @@ Thumbs.db
 
 # python compiled code
 *.pyc
-__pycache__
+__pycache__/
