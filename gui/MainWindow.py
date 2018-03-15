@@ -10,17 +10,6 @@ from .ui_MainWindow import Ui_MainWindow
 from matplotlib import cm
 import numpy as np
 
-'''
-class ResizeLabel(QLabel):
-    sig_resize = pyqtSignal()
-    def __init__(self):
-        super(QLabel, self).__init__()
-
-    def resizeEvent(self, event):
-        QLabel.resizeEvent(self, event)
-        self.sig_resize.emit()
-'''
-
 class MainWindow(QMainWindow):
 
     def __init__(self):
@@ -29,42 +18,25 @@ class MainWindow(QMainWindow):
         self.ui.setupUi(self)
 
         # signal connections
-        self.ui.rbVMove.toggled.connect(self.on_calib_rb_changed)
+        self.ui.rbVCalib.toggled.connect(self.on_calib_rb_changed)
         self.ui.rbVScan.toggled.connect(self.on_scan_rb_changed)
         self.ui.rbBothScan.toggled.connect(self.on_scan_rb_changed)
 
         self.ui.lblServerMsg.hide()
 
         # calibration page defaults
-        self.ui.lblVCalib.setText('1. Not set\n2. Not set')
-        self.ui.lblHCalib.setText('1. Not set\n2. Not set')
-        self.ui.lblVolCalib.setText('1. Not set\n2. Not set')
+        #self.ui.lblVCalib.setText('1. Not set\n2. Not set')
+        #self.ui.lblHCalib.setText('1. Not set\n2. Not set')
+        #self.ui.lblVolCalib.setText('1. Not set\n2. Not set')
 
         # disable calibration page manually (I don't know why I can't do this in Creator)
         self.ui.tab.setEnabled(False)
         self.ui.gbHCalib.setEnabled(False)
 
         # scan page
-        # initialize two special labels which emit signals on resize
-        # Qt would ideally have this as a default...
-        '''
-        self.lblColorScale = ResizeLabel()
-        self.lblScanStatus = ResizeLabel()
-        self.lblColorScale.setFrameStyle(QFrame.Box)
-        self.lblScanStatus.setFrameStyle(QFrame.Box)
-        self.lblColorScale.setMinimumHeight(15)
-        self.lblScanStatus.setSizePolicy(
-            QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding))
-        self.lblColorScale.setSizePolicy(
-            QSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred))
-
-        self.lblScanStatus.sig_resize.connect(self.on_scan_hist_resize)
-        self.lblColorScale.sig_resize.connect(self.on_scan_hist_resize)
-
-        #self.ui.lyScan.insertWidget(1, self.lblScanStatus)
-        self.ui.lyGrad.insertWidget(2, self.lblColorScale)
-        '''
-
+        # the only way these two lines will work is if the target
+        # label has ignored QSizePolicy. Otherwise setting the pixmap
+        # will update the size hint and cause the label to grow on every frame.
         self.ui.lblScanStatus.resizeEvent = self.on_scan_hist_resize
         self.ui.lblColorScale.resizeEvent = self.on_scan_hist_resize
         self._scan_color_scale = cm.viridis
@@ -73,7 +45,7 @@ class MainWindow(QMainWindow):
         self._vdata = None
 
     def on_calib_rb_changed(self):
-        if self.ui.rbVMove.isChecked():
+        if self.ui.rbVCalib.isChecked():
             self.ui.gbVCalib.setEnabled(True)
             self.ui.gbHCalib.setEnabled(False)
         else:

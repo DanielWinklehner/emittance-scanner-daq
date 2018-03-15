@@ -7,7 +7,7 @@ import socket
 import time
 import threading
 import sys
-import subprocess
+import Queue
 from inspect import isclass
 # from collections import OrderedDict
 
@@ -17,7 +17,7 @@ debug = False
 
 TCP_IP = '0.0.0.0'
 TCP_PORT = 5000
-BUFFER_SIZE = 64  # Normally 1024, but we want fast response
+BUFFER_SIZE = 1024  # Normally 1024, but we want fast response
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -27,7 +27,91 @@ s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.bind((TCP_IP, TCP_PORT))
 s.listen(1)
 
+# device dict just holds device name & current values for dummy server
 devices = {'pico': 0.0, 'vstepper': 0.0, 'hstepper': 0.0, 'vreg': 0.0}
+
+#hstepper_thread = threading.Thread(target=)
+#vreg_thread = threading.Thread(target=)
+
+vstepper_queue = Queue.Queue()
+hstepper_queue = Queue.Queue()
+
+class Mover():
+    def __init__(self, device, speed):
+        self._dt = 0.01
+        self._device = device
+        self._terminate = False
+        self._target = devices[device]
+        self._speed = speed
+
+    def run(self):
+        while not self._terminate:
+            _dir = 1 if devices[self._device] < self._target else -1
+            current_target = self._target
+            while abs(devices[self._device] - self._target) > self._speed * self._dt:
+                devices[self._device] += self._speed * self._dt * _dir
+                time.sleep(self._dt)
+                if self._target != current_target:
+                    break
+            else:
+                # i.e. the loop terminated naturally
+                devices[self._device] = self._target
+                time.sleep(self._dt)
+
+    def set_target(self, value):
+        self._target = value
+
+    def terminate(self):
+        self._terminate = True
+
+def run_vstepper():
+    vmover = Mover('vstepper', 6400)
+    move_thread = threading.Thread(target=vmover.run)
+    move_thread.start()
+    while True:
+        if not vstepper_queue.empty():
+            cmd = vstepper_queue.get_nowait()
+            if cmd[:2] == 'MA':
+                target = min(max(float(cmd.split(' ')[1]), -50000), 50000)
+                vmover.set_target(target)
+            elif cmd == 'SL - SP':
+                target = -50000
+                vmover.set_target(target)
+            elif cmd == 'SL SP':
+                target = 50000
+                vmover.set_target(target)
+            elif cmd == '\x1b':
+                vmover.set_target(devices['vstepper'])
+        else:
+            pass
+
+def run_hstepper():
+    hmover = Mover('hstepper', 6400)
+    move_thread = threading.Thread(target=hmover.run)
+    move_thread.start()
+    while True:
+        if not hstepper_queue.empty():
+            cmd = hstepper_queue.get_nowait()
+            if cmd[:2] == 'MA':
+                target = min(max(float(cmd.split(' ')[1]), -50000), 50000)
+                hmover.set_target(target)
+            elif cmd == 'SL - SP':
+                target = -50000
+                hmover.set_target(target)
+            elif cmd == 'SL SP':
+                target = 50000
+                hmover.set_target(target)
+            elif cmd == '\x1b':
+                hmover.set_target(devices['hstepper'])
+        else:
+            pass
+
+# need some fake processes to be able to simulate delayed responses from devices
+vstepper_thread = threading.Thread(target=run_vstepper)
+hstepper_thread = threading.Thread(target=run_hstepper)
+
+vstepper_thread.start()
+hstepper_thread.start()
 
 def poll():
     '''
@@ -53,13 +137,10 @@ def vset(arg):
         pass
 
 def hmove(arg):
-    if arg[:2] == 'MA':
-        devices['hstepper'] = float(arg.split(' ')[1])
+    hstepper_queue.put(arg)
 
 def vmove(arg):
-    if arg[:2] == 'MA':
-        devices['vstepper'] = float(arg.split(' ')[1])
-
+    vstepper_queue.put(arg)
 
 def set_devices(v=None, h=None, vol=None):
     ''' gui can send one command to move a stepper and set voltage '''
@@ -122,6 +203,4 @@ try:
 
         conn.close()
 except KeyboardInterrupt:
-    for device_name, info in devices.iteritems():
-        if not isclass(info['device']):
-            info['device'].terminate()
+    vstsepper_thread = None

@@ -4,7 +4,7 @@ import socket
 import time
 import threading
 import sys
-import subprocess
+import subprocess # for running usb script on linux
 from inspect import isclass
 # from collections import OrderedDict
 
@@ -16,7 +16,7 @@ debug = False
 
 TCP_IP = '0.0.0.0'
 TCP_PORT = 5000
-BUFFER_SIZE = 64  # Normally 1024, but we want fast response
+BUFFER_SIZE = 1024  # Normally 1024, but we want fast response
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 

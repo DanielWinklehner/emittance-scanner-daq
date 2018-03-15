@@ -11,12 +11,13 @@ import select
 import time
 import timeit
 import queue
+import threading
 from collections import deque
 
 import numpy as np
 
 from PyQt5.QtCore import QObject, QThread, QTimer, pyqtSignal, pyqtSlot
-from PyQt5.QtWidgets import QApplication, QFileDialog
+from PyQt5.QtWidgets import QApplication, QFileDialog, QDialog
 
 from gui import MainWindow
 
@@ -54,7 +55,7 @@ class CouldNotConnectError(Exception):
 
 
 class Daq(QObject):
-    ''' Class for collecting and organizing data '''
+    ''' Class for collecting and organizing data from scans '''
 
     sig_msg = pyqtSignal(str)
     sig_new_pt = pyqtSignal()
@@ -102,7 +103,7 @@ class Daq(QObject):
     def close_enough(self, val1, val2):
         ''' Really dumb function for comparing floats '''
         epsilon = 1e-6
-        return (val1 < val2 + epsilon) and (val1 > val2 - epsilon)
+        return abs(val1 - val2) < epsilon
 
     def run(self):
         # do vertical scan
@@ -149,6 +150,9 @@ class Daq(QObject):
 
         print(self._vdata)
         self._terminate = True
+        # move stepper to parked position -- calibration point 2 is tuple with (steps, mm), use steps
+        msg = 'setall {} {} {}'.format(None, None, self._devices['vstepper']['calibration'][1][0])
+        self.sig_msg.emit(msg)
         self.sig_done.emit()
 
     @property
@@ -267,22 +271,8 @@ class Comm(QObject):
 class DaqView():
 
     def __init__(self):
+
         self._window = MainWindow.MainWindow()
-
-        '''
-        col_names = ['pos', 'v', 'i']
-        test_data = np.zeros(shape=(20, 3))
-        test_data.dtype = [(name, test_data.dtype) for name in col_names]
-        for i in range(10):
-            for j in range(2):
-                test_data[2*i+j]['pos'] = i - 5.
-                test_data[2*i+j]['v'] = 0.1 * (j+1)
-                test_data[2*i+j]['i'] = np.random.normal(1,1)
-
-        print(test_data)
-
-        self._window.draw_scan_hist(test_data)
-        '''
 
         self._window.btnConnect.clicked.connect(self.connect_to_server)
         self._window.ui.btnExit.triggered.connect(self.exit)
@@ -291,21 +281,13 @@ class DaqView():
         self._window.ui.btnRetract.clicked.connect(lambda: self.stepper_com('SL SP'))
         self._window.ui.btnExtend.clicked.connect(lambda: self.stepper_com('SL - SP'))
         self._window.ui.btnStop.clicked.connect(lambda: self.stepper_com('\x1b')) # esc key
-        self._window.ui.btnCalibMoveSet.clicked.connect(self.calib_move_set)
 
         # calibration buttons
-        self._window.ui.btnVCalibSet.clicked.connect(self.set_vstepper_calibration)
-        self._window.ui.btnHCalibSet.clicked.connect(self.set_hstepper_calibration)
-        self._window.ui.btnVolCalibSet.clicked.connect(self.set_vreg_calibration)
-
-        self._window.ui.btnVCalibReset.clicked.connect(self.reset_vstepper_calibration)
-        self._window.ui.btnHCalibReset.clicked.connect(self.reset_hstepper_calibration)
-
-        # calibration radio buttons
-        self._window.ui.rbVCalibPt1.toggled.connect(self.on_v_calib_check_changed)
-        self._window.ui.rbHCalibPt1.toggled.connect(self.on_h_calib_check_changed)
+        self._window.ui.btnStartVCalib.clicked.connect(self.start_vstepper_calibration)
+        self._window.ui.btnStartHCalib.clicked.connect(self.start_hstepper_calibration)
 
         # scan buttons
+        self._window.ui.btnChooseFile.clicked.connect(self.choose_file)
         self._window.ui.btnStartStopScan.clicked.connect(self.scan)
 
         # testing buttons
@@ -479,7 +461,7 @@ class DaqView():
                     )
                 )
 
-    # stepper buttons on calibration page call this function with fixed commands
+    # stepper buttons on home page call this function with fixed commands
     def stepper_com(self, cmd):
         if self._window.ui.rbVMove.isChecked():
             msg = 'vmove '
@@ -489,36 +471,6 @@ class DaqView():
         msg += cmd
 
         self._comm._command_queue.put(msg)
-
-    def calib_move_set(self):
-        ''' Called when the user presses Go button on calibration page '''
-
-        stepdest = None
-        vdest = None
-
-        # Did the user provide a number of steps?
-        steptxt = self._window.ui.txtMovePos.text()
-        if steptxt.strip() != '':
-            try:
-                stepdest = int(steptxt)
-            except ValueError:
-                pass
-
-        # Did the user provide a voltage target?
-        vtxt = self._window.ui.txtMoveV.text()
-        if vtxt.strip() != '':
-            try:
-                stepdest = float(steptxt)
-            except ValueError:
-                pass
-
-        if stepdest is not None:
-            # send the absolute move command to the selected stepper
-            self.stepper_com('MA {}'.format(stepdest))
-
-        if vdest is not None:
-            # send the voltage set command to the voltage regulator
-            self._comm._command_queue.put('vset {}'.format(vdest))
 
     def check_calibration(self):
         ''' Determines if certain devices are calibrated or not '''
@@ -561,73 +513,109 @@ class DaqView():
             # if both calibrated, we can do a 2-axis scan
             self._window.ui.rbBothScan.setEnabled(True)
 
-    def set_vstepper_calibration(self):
-        # see if the user entered an Ok value
+    ############################
+    # Calibration page functions
+    ############################
+
+    def start_vstepper_calibration(self):
         try:
-            val = float(self._window.ui.txtVCalib.text().strip())
+            upper = float(self._window.ui.txtVCalibUpper.text().strip())
+            lower = float(self._window.ui.txtVCalibLower.text().strip())
         except ValueError:
+            # TODO: Meaningful error message
             return
 
-        #is the user setting pt 1 or pt 2?
-        idx = 0
-        if self._window.ui.rbVCalibPt2.isChecked():
-            idx = 1
-            self._window.ui.rbVCalibPt1.setChecked(True)
-        else:
-            self._window.ui.rbVCalibPt2.setChecked(True)
+        if upper == lower:
+            # TODO: Meaningful error message
+            return
 
-        self._devices['vstepper']['calibration'][idx] = \
-                (self._devices['vstepper']['value'], val)
+        self._calibration_thread = threading.Thread(target=self.set_stepper_calibration, args=('vstepper', upper, lower))
+        self._calibration_thread.start()
+        self._window.tabCalib.setEnabled(False)
+        self._window.tabScan.setEnabled(False)
+        self._window.ui.gbSteppers.setEnabled(False)
 
-        # replace the label text depending on which point is selected
-        msg = self._window.ui.lblVCalib.text().split('\n')
-        msg[idx] = '{} mm = {} steps'.format(int(val),
-                int(self._devices['vstepper']['value']))
-        self._window.ui.lblVCalib.setText('\n'.join(msg))
+    def start_hstepper_calibration(self):
+        try:
+            upper = float(self._window.ui.txtHCalibUpper.text().strip())
+            lower = float(self._window.ui.txtHCalibLower.text().strip())
+        except ValueError:
+            # TODO: Meaningful error message
+            return
+
+        if upper == lower:
+            # TODO: Meaningful error message
+            return
+
+        self._calibration_thread = threading.Thread(target=self.set_stepper_calibration, args=('hstepper', upper, lower))
+        self._calibration_thread.start()
+        self._window.tabCalib.setEnabled(False)
+        self._window.tabScan.setEnabled(False)
+        self._window.ui.gbSteppers.setEnabled(False)
+
+    def set_stepper_calibration(self, stepper, upper, lower):
+        # send command to extend stepper
+        # wait until stepper isnt moving anymore
+        # set first point
+        # send command to retract stepper
+        # set second point
+
+        waittime = 0.1 # TODO maybe this should depend on the polling rate?
+        prefix = 'vmove ' if stepper == 'vstepper' else 'hmove '
+
+        upper_set = False
+        lower_set = False
+
+        lower_steps = None
+        upper_steps = None
+
+        # extend stepper <=> move in negative direction
+        prev_pos = self._devices[stepper]['value']
+        msg = prefix + 'SL - SP'
+        self._comm._command_queue.put(msg)
+        while not lower_set:
+            time.sleep(waittime)
+            if self._devices[stepper]['value'] != prev_pos:
+                prev_pos = self._devices[stepper]['value']
+            else:
+                lower_steps = self._devices[stepper]['value']
+                lower_set = True
+
+        # retract stepper <=> move in positive direction
+        prev_pos = self._devices[stepper]['value']
+        msg = prefix + 'SL SP'
+        self._comm._command_queue.put(msg)
+        while not upper_set:
+            time.sleep(waittime)
+            if self._devices[stepper]['value'] != prev_pos:
+                prev_pos = self._devices[stepper]['value']
+            else:
+                upper_steps = self._devices[stepper]['value']
+                upper_set = True
+
+        self._devices[stepper]['calibration'] = \
+            [(lower_steps, lower), (upper_steps, upper)]
 
         self.check_calibration()
-
-    def reset_vstepper_calibration(self):
-        self._devices['vstepper']['calibration'] = [(None, None), (None, None)]
-        self._window.ui.lblVCalib.setText('1. Not set\n2. Not set')
-        self.check_calibration()
-
-    def set_hstepper_calibration(self):
-        pass
-
-    def reset_hstepper_calibration(self):
-        self._devices['hstepper']['calibration'] = [(None, None), (None, None)]
-        self._window.ui.lblHCalib.setText('1. Not set\n2. Not set')
-        self.check_calibration()
+        self._window.tabCalib.setEnabled(True)
+        self._window.tabScan.setEnabled(True)
+        self._window.ui.gbSteppers.setEnabled(True)
 
     def set_vreg_calibration(self):
         pass
 
-    def on_v_calib_check_changed(self):
-        ''' Get textbox ready for next calibration point '''
-        self._window.ui.txtVCalib.setText('')
-
-        pts = (self._devices['vstepper']['calibration'][0][1],
-                self._devices['vstepper']['calibration'][1][1])
-
-        if self._window.ui.rbVCalibPt1.isChecked():
-            if pts[0] is not None:
-                self._window.ui.txtVCalib.setText(str(pts[0]))
-        else:
-            if pts[1] is not None:
-                self._window.ui.txtVCalib.setText(str(pts[1]))
-
-    def on_h_calib_check_changed(self):
-        self._window.ui.txtHCalib.setText('')
-        if self._window.ui.rbHCalibPt1.isChecked():
-            pass
-        else:
-            pass
-
+    #####################
     # Scan page functions
+    #####################
     def choose_file(self):
         ''' Called when user presses choose output file button '''
-        pass
+        dlg = QFileDialog(self._window, 'Choose Data File', '' , 'CSV Files (*.csv)')
+        if dlg.exec_() == QDialog.Accepted:
+            fname = dlg.selectedFiles()[0]
+            if fname[-4:] != '.csv':
+                fname += '.csv'
+
+            self._window.ui.lblSaveFile.setText('Saving output to:\n{}'.format(fname))
 
     def on_command_ready(self, cmd):
         ''' Called when the Daq object is ready to send the next command '''
