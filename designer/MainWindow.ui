@@ -934,7 +934,7 @@
           <widget class="QWidget" name="layoutWidget">
            <layout class="QVBoxLayout" name="verticalLayout_8">
             <item>
-             <widget class="QGroupBox" name="groupBox_6">
+             <widget class="QGroupBox" name="gbFileOptions">
               <property name="title">
                <string>File Options</string>
               </property>
@@ -980,7 +980,7 @@
              </widget>
             </item>
             <item>
-             <widget class="QGroupBox" name="groupBox_2">
+             <widget class="QGroupBox" name="gbScanControls">
               <property name="title">
                <string>Scan</string>
               </property>

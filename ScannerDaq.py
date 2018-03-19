@@ -26,8 +26,13 @@ def calibrate(val, dev, reverse=False):
     ''' Converts a value to a device's units based on its calibration '''
     # python trickery to flatten a list of tuples
     if None in list(sum(dev['calibration'], ())):
-        # if calibration not set, don't do anuthing
-        return val
+        # if calibration not set, clean up argument & return
+        if isinstance(val, np.ndarray):
+            # we passed in a numpy array, so use numpy syntax
+            return np.around(val, decimals=4).astype(dev['type'])
+        else:
+            # we passed in a single value, so use default python syntax
+            return dev['type'](val)
 
     pt1 = dev['calibration'][0]
     pt2 = dev['calibration'][1]
@@ -39,11 +44,9 @@ def calibrate(val, dev, reverse=False):
     if reverse:
         # if true, assume the user passed a calibrated value and wants the
         # device value back, make sure it is the right data type
-        if len(val) > 1:
-            # we passed in a numpy array, so use numpy syntax
-            return (pt1[0] + (val - pt1[1]) / m).astype(dev['type'])
+        if isinstance(val, np.ndarray):
+            return np.around(pt1[0] + (val - pt1[1]) / m, decimals=4).astype(dev['type'])
         else:
-            # we passed in a single value, so use default python syntax
             return dev['type'](pt1[0] + (val - pt1[1]) / m)
     else:
         # return the calibrated value, has to be a float
@@ -118,7 +121,7 @@ class Daq(QObject):
             if self._devices[stepper]['value'] == prev_val:
                 msg = 'setall {} {} {}'.format(vtarget, htarget, voltarget)
                 self.sig_msg.emit(msg)
-                time.sleep(0.1)
+            time.sleep(0.1)
 
         # now send some more commands if we are not at voltage target
         if voltarget is None:
@@ -129,7 +132,7 @@ class Daq(QObject):
             if self._devices['vreg']['value'] == prev_val:
                 msg = 'setall {} {} {}'.format(None, None, voltarget)
                 self.sig_msg.emit(msg)
-                time.sleep(0.1)
+            time.sleep(0.1)
 
     def run(self):
         # do vertical scan
@@ -169,6 +172,8 @@ class Daq(QObject):
 
         self._terminate = True
         self.sig_done.emit()
+
+        return
 
     @property
     def vdata(self):
@@ -275,9 +280,16 @@ class Comm(QObject):
             else:
                 recv = False
 
+            # this line allows the thread to check its queued pyqt signals
+            app.processEvents()
+
             net_sleep = sleep_time - (timeit.default_timer() - loop_start)
             if net_sleep > 0:
                 time.sleep(net_sleep)
+
+    @pyqtSlot(str)
+    def add_message_to_queue(self, cmd):
+        self._command_queue.put(cmd)
 
     def terminate(self):
         self._terminate = True
@@ -346,7 +358,7 @@ class DeviceManager(QObject):
         return self._devices
 
 class DaqView():
-
+    ''' Handles interaction between GUI & server '''
     def __init__(self):
 
         self._window = MainWindow.MainWindow()
@@ -403,7 +415,7 @@ class DaqView():
 
     def test_vreg(self):
         val = np.random.normal(loc=0, scale=10)
-        self._comm._command_queue.put('vset vset {0:.2f}'.format(val))
+        self._comm.add_message_to_queue('vset vset {0:.2f}'.format(val))
         print(val)
 
     def connect_to_server(self):
@@ -436,7 +448,7 @@ class DaqView():
 
         self._comm.sig_poll_rate.connect(self.on_poll_rate)
         self._comm.sig_data.connect(self._dm.on_data)
-        self._comm.sig_data.connect(lambda x: self.update_display_values())
+        self._comm.sig_data.connect(self.update_display_values)
         self._comm.sig_done.connect(self.shutdown_communication)
         self._comm.moveToThread(self._com_thread)
         self._com_thread.started.connect(self._comm.poll)
@@ -474,36 +486,13 @@ class DaqView():
     def on_poll_rate(self, rate):
         self._window.lblPollRate.setText('Polling rate: {0:.2f} Hz'.format(rate))
 
-    def on_data(self, data):
-        ''' Updates devices when a message is received from the server '''
-
-        data = data.decode("utf-8")
-        cur, ver, hor, vol = [float(x) if x != 'ERR' \
-                                else 'ERR' for x in data.split(' ')]
-
-        self._devices['pico']['value'] = cur
-        self._devices['vstepper']['value'] = ver
-        self._devices['hstepper']['value'] = hor
-        self._devices['vreg']['value'] = vol
-
-        for device_name, info in self._devices.items():
-            if info['value'] == 'ERR':
-                info['hasErr'] = True
-            else:
-                info['hasErr'] = False
-                info['deque'].append(
-                        info['value']
-                    )
-
-        self.update_display_values()
-
     def update_display_values(self):
         ''' Updates the GUI with the latest device values '''
         for device_name, info in self._dm.devices.items():
             if info['hasErr']:
                 info['label'].setText('{0}: Error!'.format(info['name']))
             else:
-                # Device name: <value> <unit> <optional message>
+                # <Device name>: <value> <unit> <optional message>
                 info['label'].setText('{0}: {1} {2} {3}'.format(
                         info['name'], info['fmt'].format(
                             calibrate(info['value'],
@@ -522,7 +511,7 @@ class DaqView():
 
         msg += cmd
 
-        self._comm._command_queue.put(msg)
+        self._comm.add_message_to_queue(msg)
 
     def check_calibration(self):
         ''' Determines if certain devices are calibrated or not '''
@@ -581,7 +570,10 @@ class DaqView():
             # TODO: Meaningful error message
             return
 
-        self._calibration_thread = threading.Thread(target=self.set_stepper_calibration, args=('vstepper', upper, lower))
+        self._calibration_thread = threading.Thread(
+                target=self.set_stepper_calibration,
+                args=('vstepper', upper, lower)
+            )
         self._calibration_thread.start()
         self._window.tabCalib.setEnabled(False)
         self._window.tabScan.setEnabled(False)
@@ -599,7 +591,10 @@ class DaqView():
             # TODO: Meaningful error message
             return
 
-        self._calibration_thread = threading.Thread(target=self.set_stepper_calibration, args=('hstepper', upper, lower))
+        self._calibration_thread = threading.Thread(
+                target=self.set_stepper_calibration,
+                args=('hstepper', upper, lower)
+            )
         self._calibration_thread.start()
         self._window.tabCalib.setEnabled(False)
         self._window.tabScan.setEnabled(False)
@@ -624,7 +619,7 @@ class DaqView():
         # extend stepper <=> move in negative direction
         prev_pos = self._dm.devices[stepper]['value']
         msg = prefix + 'SL - SP'
-        self._comm._command_queue.put(msg)
+        self._comm.add_message_to_queue(msg)
         while not lower_set:
             time.sleep(waittime)
             if self._dm.devices[stepper]['value'] != prev_pos:
@@ -636,7 +631,7 @@ class DaqView():
         # retract stepper <=> move in positive direction
         prev_pos = self._dm.devices[stepper]['value']
         msg = prefix + 'SL SP'
-        self._comm._command_queue.put(msg)
+        self._comm.add_message_to_queue(msg)
         while not upper_set:
             time.sleep(waittime)
             if self._dm.devices[stepper]['value'] != prev_pos:
@@ -659,6 +654,7 @@ class DaqView():
     #####################
     # Scan page functions
     #####################
+
     def choose_file(self):
         ''' Called when user presses choose output file button '''
         dlg = QFileDialog(self._window, 'Choose Data File', '' , 'CSV Files (*.csv)')
@@ -668,11 +664,6 @@ class DaqView():
                 fname += '.csv'
 
             self._window.ui.lblSaveFile.setText('Saving output to:\n{}'.format(fname))
-
-    def on_command_ready(self, cmd):
-        ''' Called when the Daq object is ready to send the next command '''
-        print(cmd)
-        self._comm._command_queue.put(cmd)
 
     def on_scan_textbox_change(self):
         ''' Function that calculates the number of scan points '''
@@ -747,16 +738,21 @@ class DaqView():
         if self._window.ui.rbHScan.isChecked() or self._window.ui.rbBothScan.isChecked():
             pass
 
+        # create a new thead & daq instance
+        self._scan_thread = QThread()
         self._daq = Daq(self._dm.devices)
-        self._daq.sig_msg.connect(self.on_command_ready)
+        self._daq.sig_msg.connect(self._comm.add_message_to_queue)
         self._daq.sig_done.connect(self.on_scan_finished)
         self._daq.sig_new_pt.connect(self.on_scan_pt)
         self._daq.moveToThread(self._scan_thread)
         self._scan_thread.started.connect(self._daq.run)
+        self._scan_thread.finished.connect(self.shutdown_scan)
         self._scan_thread.start()
 
         # disable controls that could interfere with the scan
         self._window.tabCalib.setEnabled(False)
+        self._window.ui.gbScanControls.setEnabled(False)
+        self._window.ui.gbFileOptions.setEnabled(False)
         self._window.ui.gbSteppers.setEnabled(False)
 
     def on_scan_pt(self):
@@ -764,11 +760,17 @@ class DaqView():
         self._window.draw_scan_hist(self._daq.vdata)
 
     def on_scan_finished(self):
-        self._window.tabCalib.setEnabled(True)
-        self._window.ui.gbSteppers.setEnabled(True)
+        ''' Clean up after scan, and tell the thread to quit '''
+        self._daq.deleteLater()
+        self._scan_thread.quit()
+        self._scan_thread.wait()
 
-        del self._daq
-        self._scan_thread = QThread()
+    def shutdown_scan(self):
+        ''' Safely re-enable the gui once the thread is done '''
+        self._window.tabCalib.setEnabled(True)
+        self._window.ui.gbScanControls.setEnabled(True)
+        self._window.ui.gbFileOptions.setEnabled(True)
+        self._window.ui.gbSteppers.setEnabled(True)
 
     def run(self):
         self._window.show()

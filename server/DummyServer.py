@@ -36,6 +36,9 @@ devices = {'pico': 0.0, 'vstepper': 0.0, 'hstepper': 0.0, 'vreg': 0.0}
 vstepper_queue = Queue.Queue()
 hstepper_queue = Queue.Queue()
 
+# flag to kill threads
+shutdown = False
+
 class Mover():
     def __init__(self, device, speed):
         self._dt = 0.01
@@ -68,7 +71,7 @@ def run_vstepper():
     vmover = Mover('vstepper', 6400)
     move_thread = threading.Thread(target=vmover.run)
     move_thread.start()
-    while True:
+    while not shutdown:
         if not vstepper_queue.empty():
             cmd = vstepper_queue.get_nowait()
             if cmd[:2] == 'MA':
@@ -89,7 +92,7 @@ def run_hstepper():
     hmover = Mover('hstepper', 6400)
     move_thread = threading.Thread(target=hmover.run)
     move_thread.start()
-    while True:
+    while not shutdown:
         if not hstepper_queue.empty():
             cmd = hstepper_queue.get_nowait()
             if cmd[:2] == 'MA':
@@ -203,4 +206,4 @@ try:
 
         conn.close()
 except KeyboardInterrupt:
-    vstsepper_thread = None
+    shutdown = True
