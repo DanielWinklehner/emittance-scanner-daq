@@ -15,6 +15,7 @@ import threading
 from collections import deque
 
 import numpy as np
+import datetime as dt
 
 from PyQt5.QtCore import QObject, QThread, QTimer, pyqtSignal, pyqtSlot
 from PyQt5.QtWidgets import QApplication, QFileDialog, QDialog
@@ -76,15 +77,19 @@ class Daq(QObject):
         self._vdata = None
         self._hdata = None
 
-        col_names = ['pos', 'v', 'i']
-
         if self._devices['vstepper']['scan'][0] is not None:
             self._v_scan_pts = [self._devices['vstepper']['scan'][0],
                                 self._devices['vreg']['scan'][0]]
-            self._vdata = np.zeros(shape=(len(self._v_scan_pts[0]) * \
-                                            len(self._v_scan_pts[1]), 3))
-            # assign names to data columns & initialize data
-            self._vdata.dtype = [(name, self._vdata.dtype) for name in col_names]
+
+            # creates empty array with n rows and (time, pos, v, i) columns
+            # n = # of vstepper points * # of vreg points
+            self._vdata = np.empty(shape=(len(self._v_scan_pts[0]) * \
+                                            len(self._v_scan_pts[1]), 1),
+                                    dtype=[('time', object),
+                                           ('pos', object),
+                                           ('v', object),
+                                           ('i', object)]
+                                    )
 
             vsteps = len(self._v_scan_pts[1])
             for i, vtarget in enumerate(self._v_scan_pts[0]):
@@ -92,14 +97,30 @@ class Daq(QObject):
                     self._vdata[i * vsteps + j]['pos'] = calibrate(vtarget, self._devices['vstepper'])
                     self._vdata[i * vsteps + j]['v'] = calibrate(vtargetv, self._devices['vreg'])
 
+            # initialize currents to nan so that the gui can draw null bins on 2d histogram
             self._vdata['i'] = np.nan
 
+        # repeat above block for hstepper
         if self._devices['hstepper']['scan'][0] is not None:
             self._h_scan_pts = [self._devices['hstepper']['scan'][0],
                                 self._devices['vreg']['scan'][1]]
-            self._hdata = np.zeros(shape=(len(self._h_scan_pts[0]) * \
-                                            len(self._h_scan_pts[1]), 3))
-            self._vdata.dtype = [(name, self._vdata.dtype) for name in col_names]
+
+            self._hdata = np.empty(shape=(len(self._h_scan_pts[0]) * \
+                                            len(self._h_scan_pts[1]), 1),
+                                    dtype=[('time', object),
+                                           ('pos', object),
+                                           ('v', object),
+                                           ('i', object)]
+                                    )
+
+            hsteps = len(self._h_scan_pts[1])
+            for i, htarget in enumerate(self._h_scan_pts[0]):
+                for j, htargetv in enumerate(self._h_scan_pts[1]):
+                    self._hdata[i * hsteps + j]['pos'] = calibrate(htarget, self._devices['hstepper'])
+                    self._hdata[i * hsteps + j]['v'] = calibrate(htargetv, self._devices['vreg'])
+
+            # initialize currents to nan so that the gui can draw null bins on 2d histogram
+            self._hdata['i'] = np.nan
 
         self._terminate = False
 
@@ -112,10 +133,11 @@ class Daq(QObject):
         ''' Sends set command and waits until devices have reached set point '''
 
         stepper = 'vstepper' if  vtarget is not None else 'hstepper'
+        target = vtarget if vtarget is not None else htarget
 
         prev_val = self._devices[stepper]['value']
         # stepper motor is traditionally slower so try that first
-        while not self.close_enough(self._devices[stepper]['value'], vtarget):
+        while not self.close_enough(self._devices[stepper]['value'], target):
             # server expects setall <v stepper value> <h stepper value> <vreg value>s
             # only want to send command if we are stuck
             if self._devices[stepper]['value'] == prev_val:
@@ -134,41 +156,51 @@ class Daq(QObject):
                 self.sig_msg.emit(msg)
             time.sleep(0.1)
 
-    def run(self):
-        # do vertical scan
-        if self._v_scan_pts != None:
-            # initialize by setting devices at initial values
-            vtarget = self._v_scan_pts[0][0]
-            vtargetv = self._v_scan_pts[1][0]
-            vsteps = len(self._v_scan_pts[1])
+    def scan(self, stepper, stepper_pts, vreg_pts):
+        vtarget, htarget = (stepper_pts[0], None) if stepper == 'vstepper' else (None, stepper_pts[0])
+        targetv = vreg_pts[0]
+        vsteps = len(vreg_pts)
 
-            self.safe_move(vtarget, None, vtargetv)
+        self.safe_move(vtarget, htarget, targetv)
 
-            time.sleep(1)
+        time.sleep(1)
 
-            # start scan
-            for i, vtarget in enumerate(self._v_scan_pts[0]):
-                self.safe_move(vtarget, None, None)
+        # start scan
+        for i, target in enumerate(stepper_pts):
+            vtarget, htarget = (target, None) if stepper == 'vstepper' else (None, target)
+            self.safe_move(vtarget, htarget, None)
 
-                # loop over voltages once we are at the correct position
-                for j, vtargetv in enumerate(self._v_scan_pts[1]):
-                    self.safe_move(vtarget, None, vtargetv)
+            # loop over voltages once we are at the correct position
+            for j, targetv in enumerate(vreg_pts):
+                self.safe_move(vtarget, htarget, targetv)
 
-                    # once we are at the target values, we find average current
-                    currents = []
-                    for k in range(50):
-                        currents.append(self._devices['pico']['value'])
-                        time.sleep(0.001)
+                # once we are at the target values, we find average current
+                t = dt.datetime.strftime(dt.datetime.now(), '%Y-%m-%d %H:%M:%S.%f')
+                currents = []
+                for k in range(50):
+                    currents.append(self._devices['pico']['value'])
+                    time.sleep(0.001)
 
-                    current = np.mean(currents)
-                    self._vdata[i * vsteps + j]['i'] = current
-                    self.sig_new_pt.emit()
+                current = np.mean(currents)
+                self._vdata[i * vsteps + j]['i'] = current
+                self._vdata[i * vsteps + j]['time'] = t
+                self.sig_new_pt.emit()
 
         print(self._vdata)
 
         # move stepper to parked position -- calibration point 1 is tuple with (steps, mm), use steps
-        vtarget = self._devices['vstepper']['calibration'][0][0]
-        self.safe_move(vtarget, None, None)
+        target = self._devices[stepper]['calibration'][0][0]
+        self.safe_move(target, None, None) if stepper == 'vstepper' else \
+            self.safe_move(None, target, None)
+
+    def run(self):
+        # do vertical scan
+        if self._v_scan_pts != None:
+            self.scan('vstepper', self._v_scan_pts[0], self._v_scan_pts[1])
+
+        if self._h_scan_pts != None:
+            self.scan('hstepper', self._h_scan_pts[0], self._h_scan_pts[1])
+
 
         self._terminate = True
         self.sig_done.emit()
@@ -552,6 +584,8 @@ class DaqView():
                 return
 
             # if both calibrated, we can do a 2-axis scan
+            self._window.ui.rbVScan.setEnabled(True)
+            self._window.ui.rbHScan.setEnabled(True)
             self._window.ui.rbBothScan.setEnabled(True)
 
     ############################
@@ -717,8 +751,8 @@ class DaqView():
             # otherwise we can calculate the number of vertical points
             self._dm.devices['hstepper']['scan'] = [calibrate(np.arange(hmin, hmax, hstep), self._dm.devices['hstepper'], reverse=True)]
             self._dm.devices['vreg']['scan'][1] = calibrate(np.arange(hminv, hmaxv, hstepv), self._dm.devices['vreg'], reverse=True)
-            v_points = len(self._dm.devices['hstepper']['scan'][0]) * \
-                        len(self._dm.devices['hreg']['scan'][1])
+            h_points = len(self._dm.devices['hstepper']['scan'][0]) * \
+                        len(self._dm.devices['vreg']['scan'][1])
 
         # if we made it here, then we can update the text box
         self._window.ui.lblScanPoints.setText(
@@ -731,6 +765,11 @@ class DaqView():
         points to scan from the textboxes, and creates a Daq object
         which runs in its own thread
         '''
+
+        # we call this again because the user can re-calibrate between scans
+        # without changing the textboxes, so the scan points wouldn't be set
+        # correctly without it
+        self.on_scan_textbox_change()
 
         if self._window.ui.rbVScan.isChecked() or self._window.ui.rbBothScan.isChecked():
             pass

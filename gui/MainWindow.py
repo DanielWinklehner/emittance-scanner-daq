@@ -129,7 +129,7 @@ class MainWindow(QMainWindow):
             if max_v == min_v or max_pos == min_pos or max_current == min_current:
                 continue
 
-            if not np.isnan(data[i]['i']):
+            if not np.isnan(data[i]['i'][0]):
                 perc_current = (data[i]['i'] - min_current) / (max_current - min_current)
                 r, g, b, _ = (int(255 * q) for q in self._scan_color_scale(int(perc_current * 255)))
                 brush = QBrush(QColor(r, g, b))
