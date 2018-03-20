@@ -9,7 +9,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1070</width>
+    <width>1154</width>
     <height>762</height>
    </rect>
   </property>
@@ -1414,15 +1414,11 @@
                  </item>
                  <item>
                   <widget class="QPushButton" name="btnStartStopScan">
+                   <property name="enabled">
+                    <bool>false</bool>
+                   </property>
                    <property name="text">
                     <string>Start Scan</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item>
-                  <widget class="QPushButton" name="btnContinueScan">
-                   <property name="text">
-                    <string>Continue Scan</string>
                    </property>
                   </widget>
                  </item>
@@ -1452,14 +1448,31 @@
            </property>
            <layout class="QVBoxLayout" name="verticalLayout_16">
             <item>
-             <widget class="QLabel" name="label_18">
-              <property name="styleSheet">
-               <string notr="true">font-weight: bold</string>
-              </property>
-              <property name="text">
-               <string>Vertical</string>
-              </property>
-             </widget>
+             <layout class="QHBoxLayout" name="horizontalLayout_19">
+              <item>
+               <widget class="QRadioButton" name="rbVScanStatus">
+                <property name="styleSheet">
+                 <string notr="true">font-weight: bold</string>
+                </property>
+                <property name="text">
+                 <string>Vertical</string>
+                </property>
+                <property name="checked">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QRadioButton" name="rbHScanStatus">
+                <property name="styleSheet">
+                 <string notr="true">font-weight: bold</string>
+                </property>
+                <property name="text">
+                 <string>Horizontal</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
             </item>
             <item>
              <widget class="QSplitter" name="splitter_2">
@@ -1625,7 +1638,7 @@
                </property>
                <layout class="QVBoxLayout" name="verticalLayout_15">
                 <item>
-                 <widget class="QLabel" name="label_21">
+                 <widget class="QLabel" name="lblScanProgress">
                   <property name="font">
                    <font>
                     <family>MS Sans Serif</family>
@@ -1664,7 +1677,7 @@
                  </widget>
                 </item>
                 <item>
-                 <widget class="QLabel" name="label_22">
+                 <widget class="QLabel" name="lblScanTime">
                   <property name="font">
                    <font>
                     <family>MS Sans Serif</family>
@@ -1695,7 +1708,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1070</width>
+     <width>1154</width>
      <height>26</height>
     </rect>
    </property>
@@ -1755,7 +1768,6 @@
   <tabstop>txtHMaxV</tabstop>
   <tabstop>txtHStepV</tabstop>
   <tabstop>btnStartStopScan</tabstop>
-  <tabstop>btnContinueScan</tabstop>
  </tabstops>
  <resources/>
  <connections/>

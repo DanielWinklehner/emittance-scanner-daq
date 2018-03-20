@@ -42,6 +42,7 @@ class MainWindow(QMainWindow):
         self._scan_color_scale = cm.viridis
 
         # local copy of data arrays to plot
+        self._hdata = None
         self._vdata = None
 
     def on_calib_rb_changed(self):
@@ -52,19 +53,43 @@ class MainWindow(QMainWindow):
             self.ui.gbVCalib.setEnabled(False)
             self.ui.gbHCalib.setEnabled(True)
 
+    def enable_scan_controls(self, val):
+        ''' Enumerates controls that should be disabled when scan starts '''
+        self.ui.gbVScan.setEnabled(val)
+        self.ui.gbHScan.setEnabled(val)
+        self.ui.rbVScan.setEnabled(val)
+        self.ui.rbHScan.setEnabled(val)
+        self.ui.rbBothScan.setEnabled(val)
+        self.ui.gbFileOptions.setEnabled(val)
+        if val:
+            # if we are re-enabling everything, make sure the groupboxes match
+            # the selected radiobutton
+            self.on_scan_rb_changed()
+
     def on_scan_rb_changed(self):
         if not (self.ui.rbVScan.isChecked() or self.ui.rbHScan.isChecked()):
             self.ui.gbVScan.setEnabled(True)
             self.ui.gbHScan.setEnabled(True)
+            self.ui.rbVScanStatus.setEnabled(True)
+            self.ui.rbHScanStatus.setEnabled(True)
         elif (self.ui.rbVScan.isChecked()):
             self.ui.gbVScan.setEnabled(True)
             self.ui.gbHScan.setEnabled(False)
+            self.ui.rbVScanStatus.setChecked(True)
+            self.ui.rbVScanStatus.setEnabled(True)
+            self.ui.rbHScanStatus.setEnabled(False)
         else:
             self.ui.gbVScan.setEnabled(False)
             self.ui.gbHScan.setEnabled(True)
+            self.ui.rbHScanStatus.setChecked(True)
+            self.ui.rbVScanStatus.setEnabled(False)
+            self.ui.rbHScanStatus.setEnabled(True)
 
     def on_scan_hist_resize(self, event=None):
-        self.draw_scan_hist(self._vdata)
+        if self.ui.rbVScanStatus.isChecked():
+            self.draw_scan_hist(self._vdata)
+        else:
+            self.draw_scan_hist(self._hdata)
         self.draw_scan_color_scale()
 
     def draw_scan_color_scale(self):
@@ -87,13 +112,22 @@ class MainWindow(QMainWindow):
 
     def draw_scan_hist(self, data):
 
-        if data is None:
-            return
-
-        self._vdata = data
-
         w = float(self.ui.lblScanStatus.width())
         h = float(self.ui.lblScanStatus.height())
+
+        if data is None:
+            self._px = QPixmap(int(w), int(h))
+            self._px.fill(QColor(255, 255, 255))
+            self.ui.lblScanStatus.setPixmap(self._px)
+            self.ui.lblColorScaleMin.setText('--')
+            self.ui.lblColorScaleMid.setText('--')
+            self.ui.lblColorScaleMax.setText('--')
+            return
+
+        if self.ui.rbVScanStatus.isChecked():
+            self._vdata = data
+        else:
+            self._hdata = data
 
         self._px = QPixmap(int(w), int(h))
         self._px.fill(QColor(255, 255, 255))
@@ -148,7 +182,6 @@ class MainWindow(QMainWindow):
             if prev_x + rect_width != x:
                 width_fix = 2
                 x_fix = -1
-
 
             painter.fillRect(x + x_fix, y, rect_width + width_fix, rect_height + height_fix, brush)
 

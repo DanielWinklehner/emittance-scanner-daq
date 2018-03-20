@@ -61,9 +61,11 @@ class CouldNotConnectError(Exception):
 class Daq(QObject):
     ''' Class for collecting and organizing data from scans '''
 
-    sig_msg = pyqtSignal(str)
-    sig_new_pt = pyqtSignal()
-    sig_done = pyqtSignal()
+    sig_msg = pyqtSignal(str) # emit when ready to send command to server
+    sig_new_pt = pyqtSignal(object) # emit when the scan completes a new point
+    sig_scan_started = pyqtSignal(str, str) # emits timestamps when scan starts
+    sig_scan_finished = pyqtSignal(bool) # emits true if done, or false if there is still a horizontal scan to do
+    sig_done = pyqtSignal() # emit when all scans have completed
 
     def __init__(self, devices):
         super().__init__()
@@ -140,6 +142,11 @@ class Daq(QObject):
         while not self.close_enough(self._devices[stepper]['value'], target):
             # server expects setall <v stepper value> <h stepper value> <vreg value>s
             # only want to send command if we are stuck
+
+            # for exiting mid-scan
+            if self._terminate:
+                return
+
             if self._devices[stepper]['value'] == prev_val:
                 msg = 'setall {} {} {}'.format(vtarget, htarget, voltarget)
                 self.sig_msg.emit(msg)
@@ -151,28 +158,53 @@ class Daq(QObject):
 
         prev_val = self._devices['vreg']['value']
         while not self.close_enough(self._devices['vreg']['value'], voltarget):
+
+            # for exiting mid-scan
+            if self._terminate:
+                return
+
             if self._devices['vreg']['value'] == prev_val:
                 msg = 'setall {} {} {}'.format(None, None, voltarget)
                 self.sig_msg.emit(msg)
             time.sleep(0.1)
 
     def scan(self, stepper, stepper_pts, vreg_pts):
+
+        # make sure the other stepper is parked
+        other = 'hstepper' if stepper == 'vstepper' else 'vstepper'
+        _target = self._devices[other]['calibration'][0][0]
+        if _target is not None:
+            # if it isn't calibrated, then there's nothing we can do
+            self.safe_move(_target, None, None) if other == 'vstepper' else \
+                self.safe_move(None, _target, None)
+
         vtarget, htarget = (stepper_pts[0], None) if stepper == 'vstepper' else (None, stepper_pts[0])
         targetv = vreg_pts[0]
-        vsteps = len(vreg_pts)
+        stepsv = len(vreg_pts)
 
         self.safe_move(vtarget, htarget, targetv)
 
         time.sleep(1)
+
+        timestamp = dt.datetime.strftime(dt.datetime.now(), '%Y-%m-%d %H:%M:%S')
+        kind = 'Vertical' if stepper == 'vstepper' else 'Horizontal'
+        self.sig_scan_started.emit(timestamp, kind)
 
         # start scan
         for i, target in enumerate(stepper_pts):
             vtarget, htarget = (target, None) if stepper == 'vstepper' else (None, target)
             self.safe_move(vtarget, htarget, None)
 
+            # for exiting mid-scan, safe_move is broken out-of and lands here
+            if self._terminate:
+                break
+
             # loop over voltages once we are at the correct position
             for j, targetv in enumerate(vreg_pts):
                 self.safe_move(vtarget, htarget, targetv)
+
+                if self._terminate:
+                    break
 
                 # once we are at the target values, we find average current
                 t = dt.datetime.strftime(dt.datetime.now(), '%Y-%m-%d %H:%M:%S.%f')
@@ -182,29 +214,41 @@ class Daq(QObject):
                     time.sleep(0.001)
 
                 current = np.mean(currents)
-                self._vdata[i * vsteps + j]['i'] = current
-                self._vdata[i * vsteps + j]['time'] = t
-                self.sig_new_pt.emit()
+                idx = i * stepsv + j
+                data_frame = self._vdata if stepper == 'vstepper' else self._hdata
+                data_frame[idx]['i'] = current
+                data_frame[idx]['time'] = t
+                pt = data_frame[idx][0]
+                self.sig_new_pt.emit(pt)
 
-        print(self._vdata)
-
-        # move stepper to parked position -- calibration point 1 is tuple with (steps, mm), use steps
-        target = self._devices[stepper]['calibration'][0][0]
-        self.safe_move(target, None, None) if stepper == 'vstepper' else \
-            self.safe_move(None, target, None)
+        if not self._terminate:
+            # move stepper to parked position -- calibration point 1 is tuple with (steps, mm), use steps
+            target = self._devices[stepper]['calibration'][0][0]
+            self.safe_move(target, None, None) if stepper == 'vstepper' else \
+                self.safe_move(None, target, None)
 
     def run(self):
         # do vertical scan
-        if self._v_scan_pts != None:
+        if self._v_scan_pts is not None:
             self.scan('vstepper', self._v_scan_pts[0], self._v_scan_pts[1])
 
-        if self._h_scan_pts != None:
-            self.scan('hstepper', self._h_scan_pts[0], self._h_scan_pts[1])
+        # do horizontal scan
+        if self._h_scan_pts is not None:
+            # if we are here, let gui know we have finished vertical scan but
+            # are doing a horizontal scan
+            if self._v_scan_pts is not None:
+                # don't emit unless we have already done the vertical scan
+                self.sig_scan_finished.emit(False)
 
+            self.scan('hstepper', self._h_scan_pts[0], self._h_scan_pts[1])
 
         self._terminate = True
         self.sig_done.emit()
 
+        # now we are done with both scans
+        self.sig_scan_finished.emit(True)
+
+        # might need this line to tell Qt that this function is finished
         return
 
     @property
@@ -285,7 +329,7 @@ class Comm(QObject):
                     except socket.timeout:
                         print('timeout')
                     self._socket.send(cmd.encode())
-                    time.sleep(0.001)
+                    time.sleep(0.01)
                     continue
 
                 # otherwise just send a poll request
@@ -422,11 +466,13 @@ class DaqView():
         for txt in txtlist:
             eval('self._window.ui.{}.textChanged.connect(self.on_scan_textbox_change)'.format(txt))
 
+        self._window.ui.rbVScanStatus.toggled.connect(self.on_scan_status_rb_changed)
+
         # calibration variables
         self._vercalib = False
         self._horcalib = False
 
-        # device manager class allows devices to be updated independent of the gui thread
+        # device manager class allows devices to be updated independently of the gui thread
         self._dm = DeviceManager()
 
         # manually assign labels & properties to each device
@@ -435,13 +481,17 @@ class DaqView():
         self._dm.devices['hstepper']['label'] = self._window.lblHor
         self._dm.devices['vreg']['label'] = self._window.lblV
 
+        self._dm.devices['vstepper']['calibration'] = [(50000, 20), (-50000, -20)]
+        self.check_calibration()
 
         self._com_thread = QThread()
-        self._scan_thread = QThread()
         self._dm_thread = QThread()
 
         self._dm.moveToThread(self._dm_thread)
         self._dm_thread.start()
+
+        # default objects for saving scans
+        self._scanfile = ''
 
         self.update_display_values()
 
@@ -496,6 +546,12 @@ class DaqView():
 
     def shutdown_communication(self):
         try:
+            self._daq.terminate()
+        except AttributeError:
+            # daq object may not have been created yet
+            pass
+
+        try:
             self._comm.terminate()
             self._com_thread.quit()
             self._window.statusBar.showMessage(
@@ -511,8 +567,6 @@ class DaqView():
         self._window.tabScan.setEnabled(False)
 
         # reset devices
-        self._ver_calib_pts = (None, None)
-        self._hor_calib_pts = (None, None)
         self.check_calibration()
 
     def on_poll_rate(self, rate):
@@ -541,9 +595,7 @@ class DaqView():
         else:
             msg = 'hmove '
 
-        msg += cmd
-
-        self._comm.add_message_to_queue(msg)
+        self._comm.add_message_to_queue(msg + cmd)
 
     def check_calibration(self):
         ''' Determines if certain devices are calibrated or not '''
@@ -683,6 +735,7 @@ class DaqView():
         self._window.ui.gbSteppers.setEnabled(True)
 
     def set_vreg_calibration(self):
+        # Don't know what to do here yet.
         pass
 
     #####################
@@ -697,7 +750,13 @@ class DaqView():
             if fname[-4:] != '.csv':
                 fname += '.csv'
 
+            self._scanfile = fname
             self._window.ui.lblSaveFile.setText('Saving output to:\n{}'.format(fname))
+
+            # the start/stop scan button is enabled if the textboxes are valid
+            # and the file is set
+            self.on_scan_textbox_change()
+
 
     def on_scan_textbox_change(self):
         ''' Function that calculates the number of scan points '''
@@ -721,15 +780,20 @@ class DaqView():
                 vmaxv = float(self._window.ui.txtVMaxV.text())
                 vstepv = float(self._window.ui.txtVStepV.text())
             except ValueError:
+                # TODO: Meaningful error message
                 return
 
             # user input should be sequential, and having a step of 0 will cause a divide by zero error
             if (vmin > vmax) or (vminv > vmaxv) or vstep == 0 or vstepv == 0:
+                # TODO: Meaningful error message
                 return
 
             # otherwise we can calculate the vertical points
-            self._dm.devices['vstepper']['scan'] = [calibrate(np.arange(vmin, vmax, vstep), self._dm.devices['vstepper'], reverse=True)]
-            self._dm.devices['vreg']['scan'][0] = calibrate(np.arange(vminv, vmaxv, vstepv), self._dm.devices['vreg'], reverse=True)
+            self._dm.devices['vstepper']['scan'] = \
+                [calibrate(np.arange(vmin, vmax, vstep), self._dm.devices['vstepper'], reverse=True)]
+            self._dm.devices['vreg']['scan'][0] = \
+                calibrate(np.arange(vminv, vmaxv, vstepv), self._dm.devices['vreg'], reverse=True)
+
             v_points = len(self._dm.devices['vstepper']['scan'][0]) * \
                         len(self._dm.devices['vreg']['scan'][0])
 
@@ -743,46 +807,59 @@ class DaqView():
                 hmaxv = float(self._window.ui.txtHMaxV.text())
                 hstepv = float(self._window.ui.txtHStepV.text())
             except ValueError:
+                # TODO: Meaningful error message
                 return
 
             if (hmin > hmax) or (hminv > hmaxv) or hstep == 0 or hstepv == 0:
+                # TODO: Meaningful error message
                 return
 
             # otherwise we can calculate the number of vertical points
-            self._dm.devices['hstepper']['scan'] = [calibrate(np.arange(hmin, hmax, hstep), self._dm.devices['hstepper'], reverse=True)]
-            self._dm.devices['vreg']['scan'][1] = calibrate(np.arange(hminv, hmaxv, hstepv), self._dm.devices['vreg'], reverse=True)
+            self._dm.devices['hstepper']['scan'] = \
+                [calibrate(np.arange(hmin, hmax, hstep), self._dm.devices['hstepper'], reverse=True)]
+            self._dm.devices['vreg']['scan'][1] = \
+                calibrate(np.arange(hminv, hmaxv, hstepv), self._dm.devices['vreg'], reverse=True)
+
             h_points = len(self._dm.devices['hstepper']['scan'][0]) * \
                         len(self._dm.devices['vreg']['scan'][1])
 
         # if we made it here, then we can update the text box
         self._window.ui.lblScanPoints.setText(
                 'Total points: {}'.format(h_points + v_points))
-        self._window.ui.btnStartStopScan.setEnabled(True)
+
+        if self._scanfile != '':
+            self._window.ui.btnStartStopScan.setEnabled(True)
 
     def scan(self):
+        ''' Called when user presses the start scan button. Calculates the
+            points to scan from the textboxes, and creates a Daq object
+            which runs in its own thread
         '''
-        Called when user presses the start scan button. Calculates the
-        points to scan from the textboxes, and creates a Daq object
-        which runs in its own thread
-        '''
+
+        if self._window.ui.btnStartStopScan.text() == 'Stop Scan':
+            self._window.ui.btnStartStopScan.setText('Start Scan')
+            self._daq.terminate()
+            self.stepper_com('\x1b')
+            return
+
+        self._window.ui.btnStartStopScan.setText('Stop Scan')
 
         # we call this again because the user can re-calibrate between scans
         # without changing the textboxes, so the scan points wouldn't be set
         # correctly without it
         self.on_scan_textbox_change()
 
-        if self._window.ui.rbVScan.isChecked() or self._window.ui.rbBothScan.isChecked():
-            pass
-
-        if self._window.ui.rbHScan.isChecked() or self._window.ui.rbBothScan.isChecked():
-            pass
-
         # create a new thead & daq instance
         self._scan_thread = QThread()
         self._daq = Daq(self._dm.devices)
+
+        # connect Daq object signals
         self._daq.sig_msg.connect(self._comm.add_message_to_queue)
+        self._daq.sig_scan_started.connect(self.on_scan_start)
+        self._daq.sig_scan_finished.connect(self.on_one_scan_finished)
         self._daq.sig_done.connect(self.on_scan_finished)
         self._daq.sig_new_pt.connect(self.on_scan_pt)
+
         self._daq.moveToThread(self._scan_thread)
         self._scan_thread.started.connect(self._daq.run)
         self._scan_thread.finished.connect(self.shutdown_scan)
@@ -790,26 +867,82 @@ class DaqView():
 
         # disable controls that could interfere with the scan
         self._window.tabCalib.setEnabled(False)
-        self._window.ui.gbScanControls.setEnabled(False)
-        self._window.ui.gbFileOptions.setEnabled(False)
+        self._window.enable_scan_controls(False)
         self._window.ui.gbSteppers.setEnabled(False)
 
-    def on_scan_pt(self):
-        ''' update the plot label when a new point comes in '''
-        self._window.draw_scan_hist(self._daq.vdata)
+    def on_scan_status_rb_changed(self):
+        ''' Update the plot when the user switches views '''
+        if self._window.ui.rbVScanStatus.isChecked():
+            try:
+                self._window.draw_scan_hist(self._daq.vdata)
+            except AttributeError:
+                self._window.draw_scan_hist(None)
+        else:
+            try:
+                self._window.draw_scan_hist(self._daq.hdata)
+            except AttributeError:
+                self._window.draw_scan_hist(None)
+
+    def on_scan_start(self, time, kind):
+        # create file preamble
+        if kind == 'Vertical':
+            pts = len(self._dm.devices['vstepper']['scan'][0]) * \
+                        len(self._dm.devices['vreg']['scan'][0])
+
+            # since we are here, switch the user view to the vertical status page
+            self._window.ui.rbVScanStatus.setChecked(True)
+        else:
+            pts = len(self._dm.devices['hstepper']['scan'][0]) * \
+                        len(self._dm.devices['vreg']['scan'][1])
+
+        preamble = "# Emittance scan results\n" \
+                   "# {} scan\n" \
+                   "# Time initiated: {}\n" \
+                   "# Number of points: {}\n" \
+                   "time,pos,v,i\n".format(kind, time, str(pts))
+
+        with open(self._scanfile, 'w') as f:
+            f.write(preamble)
+
+    def on_scan_pt(self, pt):
+        ''' update the file and plot label when a new point comes in '''
+        if self._window.ui.rbVScanStatus.isChecked():
+            self._window.draw_scan_hist(self._daq.vdata)
+        else:
+            self._window.draw_scan_hist(self._daq.hdata)
+
+        # append data to text file
+        with open(self._scanfile, 'a') as f:
+            f.write(','.join([str(_) for _ in pt]))
+            f.write('\n')
+
+    def on_one_scan_finished(self, final):
+        ''' Function called after first scan (vertical) is finished.
+            Only relevant during "both" scans
+        '''
+        if not final:
+            self._window.ui.rbHScanStatus.setChecked(True)
 
     def on_scan_finished(self):
-        ''' Clean up after scan, and tell the thread to quit '''
+        ''' Clean up after scan, and tell the thread to quit
+            This function is called when the stepper has returned to
+            its original position.
+        '''
         self._daq.deleteLater()
         self._scan_thread.quit()
         self._scan_thread.wait()
 
     def shutdown_scan(self):
-        ''' Safely re-enable the gui once the thread is done '''
+        ''' Safely re-enable the gui once the thread is done. This is called
+            when the QThread holding the DAQ object emits its finished signal.
+        '''
+        self._window.ui.btnStartStopScan.setText('Start Scan')
         self._window.tabCalib.setEnabled(True)
-        self._window.ui.gbScanControls.setEnabled(True)
-        self._window.ui.gbFileOptions.setEnabled(True)
+        self._window.enable_scan_controls(True)
         self._window.ui.gbSteppers.setEnabled(True)
+
+        # call this to make sure the proper controls stay disabled
+        self.check_calibration()
 
     def run(self):
         self._window.show()
