@@ -795,6 +795,9 @@ class DaqView():
         self._dm.devices['hstepper']['scan'] = [None]
         self._dm.devices['vreg']['scan'] = [None, None]
 
+        verr = False
+        herr = False
+
         # calculate number of vectical points
         if self._window.ui.rbVScan.isChecked() or self._window.ui.rbBothScan.isChecked():
             # try to parse user input for all vertical textboxes
@@ -806,22 +809,32 @@ class DaqView():
                 vmaxv = float(self._window.ui.txtVMaxV.text())
                 vstepv = float(self._window.ui.txtVStepV.text())
             except ValueError:
-                # TODO: Meaningful error message
-                return
+                # only show error message if user has entered everything
+                txtnames = ['VMinPos', 'VMaxPos', 'VStepPos', 'VMinV', 'VMaxV', 'VStepV']
+                txtlist = [eval('self._window.ui.txt{}.text()'.format(_), {'self':self}) for _ in txtnames]
+                if '' not in txtlist:
+                    self._window.ui.lblVScanError.setText('Bad input.')
+                    self._window.ui.lblVScanError.show()
+                verr = True
 
-            # user input should be sequential, and having a step of 0 will cause a divide by zero error
-            if (vmin > vmax) or (vminv > vmaxv) or vstep == 0 or vstepv == 0:
-                # TODO: Meaningful error message
-                return
+            if not verr:
+                # user input should be sequential, and having a step of 0 will cause a divide by zero error
+                if (vmin > vmax) or (vminv > vmaxv) or vstep == 0 or vstepv == 0 or (vmin == vmax) or (vminv == vmaxv):
+                    self._window.ui.lblVScanError.setText('Bad values entered.')
+                    self._window.ui.lblVScanError.show()
+                    verr = True
 
-            # otherwise we can calculate the vertical points
-            self._dm.devices['vstepper']['scan'] = \
-                [calibrate(np.arange(vmin, vmax, vstep), self._dm.devices['vstepper'], reverse=True)]
-            self._dm.devices['vreg']['scan'][0] = \
-                calibrate(np.arange(vminv, vmaxv, vstepv), self._dm.devices['vreg'], reverse=True)
+            if not verr:
+                self._window.ui.lblVScanError.hide()
 
-            v_points = len(self._dm.devices['vstepper']['scan'][0]) * \
-                        len(self._dm.devices['vreg']['scan'][0])
+                # otherwise we can calculate the vertical points
+                self._dm.devices['vstepper']['scan'] = \
+                    [calibrate(np.arange(vmin, vmax, vstep), self._dm.devices['vstepper'], reverse=True)]
+                self._dm.devices['vreg']['scan'][0] = \
+                    calibrate(np.arange(vminv, vmaxv, vstepv), self._dm.devices['vreg'], reverse=True)
+
+                v_points = len(self._dm.devices['vstepper']['scan'][0]) * \
+                            len(self._dm.devices['vreg']['scan'][0])
 
         # calculate number of horizontal points
         if self._window.ui.rbHScan.isChecked() or self._window.ui.rbBothScan.isChecked():
@@ -833,28 +846,39 @@ class DaqView():
                 hmaxv = float(self._window.ui.txtHMaxV.text())
                 hstepv = float(self._window.ui.txtHStepV.text())
             except ValueError:
-                # TODO: Meaningful error message
-                return
+                # only show error message if user has entered everything
+                txtnames = ['HMinPos', 'HMaxPos', 'HStepPos', 'HMinV', 'HMaxV', 'HStepV']
+                txtlist = [eval('self._window.ui.txt{}.text()'.format(_), {'self':self}) for _ in txtnames]
+                if '' not in txtlist:
+                    self._window.ui.lblHScanError.setText('Bad input.')
+                    self._window.ui.lblHScanError.show()
+                herr = True
 
-            if (hmin > hmax) or (hminv > hmaxv) or hstep == 0 or hstepv == 0:
-                # TODO: Meaningful error message
-                return
+            if not herr:
+                if (hmin > hmax) or (hminv > hmaxv) or hstep == 0 or hstepv == 0 or (hmin == hmax) or (hminv == hmaxv):
+                    self._window.ui.lblHScanError.setText('Bad values entered.')
+                    self._window.ui.lblHScanError.show()
+                    herr = True
 
-            # otherwise we can calculate the number of vertical points
-            self._dm.devices['hstepper']['scan'] = \
-                [calibrate(np.arange(hmin, hmax, hstep), self._dm.devices['hstepper'], reverse=True)]
-            self._dm.devices['vreg']['scan'][1] = \
-                calibrate(np.arange(hminv, hmaxv, hstepv), self._dm.devices['vreg'], reverse=True)
+            if not herr:
+                self._window.ui.lblHScanError.hide()
 
-            h_points = len(self._dm.devices['hstepper']['scan'][0]) * \
-                        len(self._dm.devices['vreg']['scan'][1])
+                # otherwise we can calculate the number of vertical points
+                self._dm.devices['hstepper']['scan'] = \
+                    [calibrate(np.arange(hmin, hmax, hstep), self._dm.devices['hstepper'], reverse=True)]
+                self._dm.devices['vreg']['scan'][1] = \
+                    calibrate(np.arange(hminv, hmaxv, hstepv), self._dm.devices['vreg'], reverse=True)
 
-        # if we made it here, then we can update the text box
-        self._window.ui.lblScanPoints.setText(
-                'Total points: {}'.format(h_points + v_points))
+                h_points = len(self._dm.devices['hstepper']['scan'][0]) * \
+                            len(self._dm.devices['vreg']['scan'][1])
 
-        if self._scanfile != '':
-            self._window.ui.btnStartStopScan.setEnabled(True)
+        if not (verr or herr):
+            # if we made it here, then we can update the text box
+            self._window.ui.lblScanPoints.setText(
+                    'Total points: {}'.format(h_points + v_points))
+
+            if self._scanfile != '':
+                self._window.ui.btnStartStopScan.setEnabled(True)
 
     def scan(self):
         ''' Called when user presses the start scan button. Calculates the

@@ -25,3 +25,4 @@ Server and GUI for operating the MIST-1 emittance scanners
        2. Devices: calibration distances
        3. Scans: All fields could be saved
     - Fill in missing error message blocks
+    - Fill in scan status labels & estimate time remaining

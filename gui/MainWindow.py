@@ -34,6 +34,9 @@ class MainWindow(QMainWindow):
         self.ui.gbHCalib.setEnabled(False)
 
         # scan page
+        self.ui.lblVScanError.hide()
+        self.ui.lblHScanError.hide()
+
         # the only way these two lines will work is if the target
         # label has ignored QSizePolicy. Otherwise setting the pixmap
         # will update the size hint and cause the label to grow on every frame.
