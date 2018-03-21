@@ -90,6 +90,19 @@ def poll():
                 for device_name in device_names
             ]
 
+    # for stepper motors, there is a special flag to send if at minimum or maximum positions
+    if isclass(devices['vstepper']['device']):
+        if devices['vstepper']['device'].error_code == 83:
+            values[1] = '{},MAX'.format(values[1])
+        elif devices['vstepper']['device'].error_code == 84:
+            values[1] = '{},MIN'.format(values[1])
+
+    if isclass(devices['hstepper']['device']):
+        if devices['hstepper']['device'].error_code == 83:
+            values[2] = '{},MAX'.format(values[2])
+        elif devices['hstepper']['device'].error_code == 84:
+            values[2] = '{},MIN'.format(values[2])
+
     return ' '.join([str(val) for val in values])
 
 def vset(arg):

@@ -411,9 +411,21 @@ class DeviceManager(QObject):
         self._devices['hstepper']['type'] = int
 
     def on_data(self, data):
-        data = data.decode("utf-8")
-        cur, ver, hor, vol = [float(x) if x != 'ERR' \
-                                else 'ERR' for x in data.split(' ')]
+        data = data.decode("utf-8").split(' ')
+        cur = float(data[0]) if data[0] != 'ERR' else 'ERR'
+        vol = float(data[3]) if data[3] != 'ERR' else 'ERR'
+
+        # stepper motors have custom error messages at limit switches
+        vdata = data[1].split(',')
+        hdata = data[2].split(',')
+
+        ver = float(vdata[0]) if data[1] != 'ERR' else 'ERR'
+        hor = float(hdata[0]) if data[2] != 'ERR' else 'ERR'
+
+        if not isinstance(vdata, basestring):
+            # vdata is a list
+            print(vdata[1])
+
 
         self._devices['pico']['value'] = cur
         self._devices['vstepper']['value'] = ver

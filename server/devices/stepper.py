@@ -11,6 +11,9 @@ class Stepper():
         self._debug = debug
 
         self._current_value = -1.
+        self._error_code = 0
+        self._max_value = None
+        self._min_value = None
 
         self._line_ending = '\r'
 
@@ -28,7 +31,7 @@ class Stepper():
 
         # loop commands - get current position
         self._run_prgm = [
-                'PR C1', 'r'
+                'PR C1 " " ER', 'r'
             ]
 
         # server will put commands to be issued in this queue object
@@ -42,6 +45,10 @@ class Stepper():
     @property
     def current_value(self):
         return self._current_value
+
+    @property
+    def error_code(self):
+        return self._error_code
 
     def run(self):
         time.sleep(0.1)
@@ -85,8 +92,36 @@ class Stepper():
                         if self._debug:
                             print(resp)
                         try:
-                            self._current_value = float(resp)
+                            pos, err = (int(_) for _ in resp.split(' '))
+                            self._current_value = float(pos)
                             gotResp = True
+                            skip = False
+
+                            # if we were previously at lower limit switch and moved up, reset error
+                            if self._min_value is not None:
+                                if pos > self._min_value:
+                                    self._min_value = None
+                                    self._error_code = 0
+                                    skip = True
+
+                            # if we were previously at lower limit switch and moved up, reset error
+                            if self._max_value is not None:
+                                if pos < self._max_value:
+                                    self._max_value = None
+                                    self._error_code = 0
+                                    skip = True
+
+                            if err == 83 and not skip:
+                                # triggered upper limit switch. Register the error and reset error code for next command
+                                self._max_value = pos
+                                self._error_code = 83
+                                self._command_queue.put('ER 0')
+                            elif err == 84 and not skip:
+                                # triggered lower limit switch
+                                self._min_value = pos
+                                self._error_code = 84
+                                self._command_queue.put('ER 0')
+
                         except ValueError:
                             tries += 1
 
