@@ -422,10 +422,9 @@ class DeviceManager(QObject):
         ver = float(vdata[0]) if data[1] != 'ERR' else 'ERR'
         hor = float(hdata[0]) if data[2] != 'ERR' else 'ERR'
 
-        if not isinstance(vdata, basestring):
+        if not isinstance(vdata, str):
             # vdata is a list
-            print(vdata[1])
-
+            print(vdata)
 
         self._devices['pico']['value'] = cur
         self._devices['vstepper']['value'] = ver
@@ -493,7 +492,7 @@ class DaqView():
         self._dm.devices['hstepper']['label'] = self._window.lblHor
         self._dm.devices['vreg']['label'] = self._window.lblV
 
-        self._dm.devices['vstepper']['calibration'] = [(50000, 20), (-50000, -20)]
+        #self._dm.devices['vstepper']['calibration'] = [(50000, 20), (-50000, -20)]
         self.check_calibration()
 
         self._com_thread = QThread()
@@ -705,7 +704,7 @@ class DaqView():
         # send command to retract stepper
         # set second point
 
-        waittime = 0.1 # TODO maybe this should depend on the polling rate?
+        waittime = 1.0 # TODO maybe this should depend on the polling rate?
         prefix = 'vmove ' if stepper == 'vstepper' else 'hmove '
 
         upper_set = False
