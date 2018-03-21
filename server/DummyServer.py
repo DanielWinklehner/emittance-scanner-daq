@@ -130,6 +130,12 @@ def poll():
     devices['pico'] = np.random.normal(1, 1)
     values = [devices[device_name] for device_name in device_names]
 
+    for i in [1,2]:
+        if values[i] == 50000:
+            values[i] = '50000,MAX'
+        elif values[i] == -50000:
+            values[i] = '-50000,MIN'
+
     return ' '.join([str(val) for val in values])
 
 def vset(arg):

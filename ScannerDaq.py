@@ -172,11 +172,10 @@ class Daq(QObject):
 
         # make sure the other stepper is parked
         other = 'hstepper' if stepper == 'vstepper' else 'vstepper'
-        _target = self._devices[other]['calibration'][0][0]
-        if _target is not None:
-            # if it isn't calibrated, then there's nothing we can do
-            self.safe_move(_target, None, None) if other == 'vstepper' else \
-                self.safe_move(None, _target, None)
+        other_prefix = 'hmove ' if stepper == 'vstepper' else 'vmove '
+        self.sig_msg.emit(other_prefix + 'SL SP')
+        while self._devices[other]['flag'] != 'MAX':
+            time.sleep(0.1)
 
         vtarget, htarget = (stepper_pts[0], None) if stepper == 'vstepper' else (None, stepper_pts[0])
         targetv = vreg_pts[0]
@@ -329,14 +328,16 @@ class Comm(QObject):
                     except socket.timeout:
                         print('timeout')
                     self._socket.send(cmd.encode())
-                    time.sleep(0.01)
+                    time.sleep(0.05)
+                    recv = True
                     continue
 
                 # otherwise just send a poll request
-                try:
-                    self._socket.send(b'poll')
-                except socket.timeout:
-                    print('timeout')
+                else:
+                    try:
+                        self._socket.send(b'poll')
+                    except socket.timeout:
+                        print('timeout')
 
             ready = select.select([self._socket], [], [], 0)[0]
             if ready:
@@ -393,6 +394,10 @@ class DeviceManager(QObject):
                                    'scan': None # holds list of sets of points to scan
                                   }
 
+        # stepper motors have special flags to indicate max/min positions
+        self._devices['vstepper']['flag'] = ''
+        self._devices['hstepper']['flag'] = ''
+
         self._devices['pico']['name'] = 'Current'
         self._devices['vstepper']['name'] = 'Vertical'
         self._devices['hstepper']['name'] = 'Horizontal'
@@ -423,8 +428,18 @@ class DeviceManager(QObject):
         hor = float(hdata[0]) if data[2] != 'ERR' else 'ERR'
 
         if not isinstance(vdata, str):
-            # vdata is a list
-            print(vdata)
+            try:
+                self._devices['vstepper']['flag'] = vdata[1]
+            except IndexError:
+                # no flag, so reset
+                self._devices['vstepper']['flag'] = ''
+
+        if not isinstance(hdata, str):
+            try:
+                self._devices['hstepper']['flag'] = hdata[1]
+            except IndexError:
+                # no flag, so reset
+                self._devices['hstepper']['flag'] = ''
 
         self._devices['pico']['value'] = cur
         self._devices['vstepper']['value'] = ver
@@ -465,6 +480,8 @@ class DaqView():
         # scan buttons
         self._window.ui.btnChooseFile.clicked.connect(self.choose_file)
         self._window.ui.btnStartStopScan.clicked.connect(self.scan)
+        self._window.ui.rbVScan.toggled.connect(self.on_scan_rb_changed)
+        self._window.ui.rbHScan.toggled.connect(self.on_scan_rb_changed)
 
         # testing buttons
         self._window.ui.btnVregTest.clicked.connect(self.test_vreg)
@@ -492,7 +509,11 @@ class DaqView():
         self._dm.devices['hstepper']['label'] = self._window.lblHor
         self._dm.devices['vreg']['label'] = self._window.lblV
 
-        #self._dm.devices['vstepper']['calibration'] = [(50000, 20), (-50000, -20)]
+        self._dm.devices['vstepper']['calibration'] = [(50000, 20), (-50000, -20)]
+        self._dm.devices['hstepper']['calibration'] = [(50000, 20), (-50000, -20)]
+        self._vercalib = True
+        self._horcalib = True
+
         self.check_calibration()
 
         self._com_thread = QThread()
@@ -636,19 +657,26 @@ class DaqView():
 
             if not self._vercalib:
                 self._window.ui.rbVScan.setEnabled(False)
+                self._window.ui.rbVScanStatus.setEnabled(False)
                 self._window.ui.rbHScan.setChecked(True)
+                self._window.ui.rbHScanStatus.setChecked(True)
                 self._window.ui.rbBothScan.setEnabled(False)
                 return
 
             if not self._horcalib:
                 self._window.ui.rbHScan.setEnabled(False)
+                self._window.ui.rbHScanStatus.setEnabled(False)
                 self._window.ui.rbVScan.setChecked(True)
+                self._window.ui.rbVScanStatus.setChecked(True)
                 self._window.ui.rbBothScan.setEnabled(False)
                 return
 
             # if both calibrated, we can do a 2-axis scan
             self._window.ui.rbVScan.setEnabled(True)
             self._window.ui.rbHScan.setEnabled(True)
+            self._window.ui.rbVScanStatus.setEnabled(True)
+            self._window.ui.rbHScanStatus.setEnabled(True)
+            self._window.on_scan_rb_changed()
             self._window.ui.rbBothScan.setEnabled(True)
 
     ############################
@@ -704,38 +732,25 @@ class DaqView():
         # send command to retract stepper
         # set second point
 
-        waittime = 1.0 # TODO maybe this should depend on the polling rate?
+        waittime = 0.1 # TODO maybe this should depend on the polling rate?
         prefix = 'vmove ' if stepper == 'vstepper' else 'hmove '
-
-        upper_set = False
-        lower_set = False
 
         lower_steps = None
         upper_steps = None
 
         # extend stepper <=> move in negative direction
-        prev_pos = self._dm.devices[stepper]['value']
         msg = prefix + 'SL - SP'
         self._comm.add_message_to_queue(msg)
-        while not lower_set:
+        while self._dm.devices[stepper]['flag'] != 'MIN':
             time.sleep(waittime)
-            if self._dm.devices[stepper]['value'] != prev_pos:
-                prev_pos = self._dm.devices[stepper]['value']
-            else:
-                lower_steps = self._dm.devices[stepper]['value']
-                lower_set = True
+        lower_steps = self._dm.devices[stepper]['value']
 
         # retract stepper <=> move in positive direction
-        prev_pos = self._dm.devices[stepper]['value']
         msg = prefix + 'SL SP'
         self._comm.add_message_to_queue(msg)
-        while not upper_set:
+        while self._dm.devices[stepper]['flag'] != 'MAX':
             time.sleep(waittime)
-            if self._dm.devices[stepper]['value'] != prev_pos:
-                prev_pos = self._dm.devices[stepper]['value']
-            else:
-                upper_steps = self._dm.devices[stepper]['value']
-                upper_set = True
+        upper_steps = self._dm.devices[stepper]['value']
 
         self._dm.devices[stepper]['calibration'] = \
             [(upper_steps, upper), (lower_steps, lower)]
@@ -880,6 +895,10 @@ class DaqView():
         self._window.tabCalib.setEnabled(False)
         self._window.enable_scan_controls(False)
         self._window.ui.gbSteppers.setEnabled(False)
+
+    def on_scan_rb_changed(self):
+        ''' Update the total number of points when user changes scan selection '''
+        self.on_scan_textbox_change()
 
     def on_scan_status_rb_changed(self):
         ''' Update the plot when the user switches views '''

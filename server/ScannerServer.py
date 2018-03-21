@@ -31,7 +31,7 @@ devices = {
             'pico': {'device': Pico, 'serial': 'Controller', 'thread': None, 'port': 'COM6'},
             'vstepper': {'device': Stepper, 'serial': '8212017125346', 'thread': None, 'port': 'COM5'},
             'hstepper': {'device': Stepper, 'serial': 'aaa', 'thread': None, 'port': ''},
-            'vreg': {'device': object, 'serial': 'aaa', 'thread': None, 'port': ''}
+            'vreg': {'device': Vreg, 'serial': 'aaa', 'thread': None, 'port': ''}
 }
 
 '''
@@ -55,8 +55,8 @@ for device_name, info in devices.items():
     if info['port'] != '':
         info['device'] = info['device'](info['port'], debug=debug)
 
-    #if device_name == 'vreg':
-        #info['device'] = info['device'](debug=debug)
+    if device_name == 'vreg':
+        info['device'] = info['device'](debug=debug)
 
 # check that all devices were found & _initialized
 for device_name, info in devices.iteritems():
@@ -91,6 +91,7 @@ def poll():
             ]
 
     # for stepper motors, there is a special flag to send if at minimum or maximum positions
+    # indicated by error codes from the stepper motor
     if not isclass(devices['vstepper']['device']):
         if devices['vstepper']['device'].error_code == 83:
             values[1] = '{},MAX'.format(values[1])
