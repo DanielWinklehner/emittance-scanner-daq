@@ -31,7 +31,7 @@ devices = {
             'pico': {'device': Pico, 'serial': 'Controller', 'thread': None, 'port': 'COM6'},
             'vstepper': {'device': Stepper, 'serial': '8212017125346', 'thread': None, 'port': 'COM5'},
             'hstepper': {'device': Stepper, 'serial': 'aaa', 'thread': None, 'port': ''},
-            'vreg': {'device': Vreg, 'serial': 'aaa', 'thread': None, 'port': ''}
+            'vreg': {'device': object, 'serial': 'aaa', 'thread': None, 'port': ''}
 }
 
 '''
@@ -55,8 +55,8 @@ for device_name, info in devices.items():
     if info['port'] != '':
         info['device'] = info['device'](info['port'], debug=debug)
 
-    if device_name == 'vreg':
-        info['device'] = info['device'](debug=debug)
+    #if device_name == 'vreg':
+        #info['device'] = info['device'](debug=debug)
 
 # check that all devices were found & _initialized
 for device_name, info in devices.iteritems():
@@ -91,13 +91,13 @@ def poll():
             ]
 
     # for stepper motors, there is a special flag to send if at minimum or maximum positions
-    if isclass(devices['vstepper']['device']):
+    if not isclass(devices['vstepper']['device']):
         if devices['vstepper']['device'].error_code == 83:
             values[1] = '{},MAX'.format(values[1])
         elif devices['vstepper']['device'].error_code == 84:
             values[1] = '{},MIN'.format(values[1])
 
-    if isclass(devices['hstepper']['device']):
+    if not isclass(devices['hstepper']['device']):
         if devices['hstepper']['device'].error_code == 83:
             values[2] = '{},MAX'.format(values[2])
         elif devices['hstepper']['device'].error_code == 84:
@@ -166,7 +166,7 @@ try:
             if tp == ['poll']:
                 # on poll request we immediately send the result
                 conn.send(fmap[tp[0]]())
-            elif tp[0] != ['setall']:
+            elif tp[0] != 'setall':
                 # single arg commands
                 word, arg = tp
                 try:
