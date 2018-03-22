@@ -10,3 +10,7 @@ Thumbs.db
 # python compiled code
 *.pyc
 __pycache__/
+
+# daqview session files
+session.cfg
+*.csv

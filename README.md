@@ -5,7 +5,7 @@ Server and GUI for operating the MIST-1 emittance scanners
 ### TODO
 
  - Error handling
-    - Code could get stuck if user tries to set a value that the device can't output
+    - (Done: User cannot enter values exceeding stepper limits) ~~Code could get stuck if user tries to set a value that the device can't output~~
     - No defined action if user exits/stops communication during calibration
 
 
@@ -16,13 +16,14 @@ Server and GUI for operating the MIST-1 emittance scanners
 
 
  - User experience
-    - Need to pick a way to save files when doing multiple scans
-        1. Could add prefixes (e.g. file_v.csv, file_h.csv)
-        2. Could append results of horizontal scan to vertical scan file
-        3. Could add another column in the data to specify 'v' or 'h' with each data point
-    - Save session properties
-       1. Window: size, position, splitter dimensions
-       2. Devices: calibration distances
-       3. Scans: All fields could be saved
+    - (Done) ~~Need to pick a way to save files when doing multiple scans~~
+        1. ~~Could add file endings (e.g. file_v.csv, file_h.csv)~~ (Winner)
+        2. ~~Could append results of horizontal scan to vertical scan file~~
+        3. ~~Could add another column in the data to specify 'v' or 'h' with each data point~~
+    - (Done) ~~Save session properties~~
+       1. ~~Window: size, position, splitter dimensions~~
+       2. ~~Devices: calibration distances~~
+       3. ~~Scans: All fields could be saved~~
     - Fill in missing error message blocks
     - Fill in scan status labels & estimate time remaining
+    - Automatically repeat calibration at user-specified intervals

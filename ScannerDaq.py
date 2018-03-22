@@ -62,7 +62,7 @@ class Daq(QObject):
     ''' Class for collecting and organizing data from scans '''
 
     sig_msg = pyqtSignal(str) # emit when ready to send command to server
-    sig_new_pt = pyqtSignal(object) # emit when the scan completes a new point
+    sig_new_pt = pyqtSignal(object, str) # emit when the scan completes a new point, string tells which type of scan
     sig_scan_started = pyqtSignal(str, str) # emits timestamps when scan starts
     sig_scan_finished = pyqtSignal(bool) # emits true if done, or false if there is still a horizontal scan to do
     sig_done = pyqtSignal() # emit when all scans have completed
@@ -218,7 +218,7 @@ class Daq(QObject):
                 data_frame[idx]['i'] = current
                 data_frame[idx]['time'] = t
                 pt = data_frame[idx][0]
-                self.sig_new_pt.emit(pt)
+                self.sig_new_pt.emit(pt, kind)
 
         if not self._terminate:
             # move stepper to parked position -- calibration point 1 is tuple with (steps, mm), use steps
@@ -509,10 +509,11 @@ class DaqView():
         self._dm.devices['hstepper']['label'] = self._window.lblHor
         self._dm.devices['vreg']['label'] = self._window.lblV
 
-        self._dm.devices['vstepper']['calibration'] = [(50000, 20), (-50000, -20)]
-        self._dm.devices['hstepper']['calibration'] = [(50000, 20), (-50000, -20)]
-        self._vercalib = True
-        self._horcalib = True
+        # testing block
+        # self._dm.devices['vstepper']['calibration'] = [(50000, 20), (-50000, -20)]
+        # self._dm.devices['hstepper']['calibration'] = [(50000, 20), (-50000, -20)]
+        # self._vercalib = True
+        # self._horcalib = True
 
         self.check_calibration()
 
@@ -599,6 +600,9 @@ class DaqView():
         self._window.tabScan.setEnabled(False)
 
         # reset devices
+        self._dm.devices['vstepper']['calibration'] = [(None, None), (None, None)]
+        self._dm.devices['hstepper']['calibration'] = [(None, None), (None, None)]
+
         self.check_calibration()
 
     def on_poll_rate(self, rate):
@@ -777,12 +781,11 @@ class DaqView():
                 fname += '.csv'
 
             self._scanfile = fname
-            self._window.ui.lblSaveFile.setText('Saving output to:\n{}'.format(fname))
+            #self._window.ui.lblSaveFile.setText('Saving output to:\n{}'.format(fname))
 
             # the start/stop scan button is enabled if the textboxes are valid
             # and the file is set
-            self.on_scan_textbox_change()
-
+            self.on_scan_rb_changed()
 
     def on_scan_textbox_change(self):
         ''' Function that calculates the number of scan points '''
@@ -801,16 +804,18 @@ class DaqView():
         # calculate number of vectical points
         if self._window.ui.rbVScan.isChecked() or self._window.ui.rbBothScan.isChecked():
             # try to parse user input for all vertical textboxes
+            txtnames = ['VMinPos', 'VMaxPos', 'VStepPos', 'VMinV', 'VMaxV', 'VStepV']
+            ns = {} # local variables created with exec go in this "namespace".
+                    # Otherwise exec creates globals in python 3 which could be bad
             try:
-                vmin = float(self._window.ui.txtVMinPos.text())
-                vmax = float(self._window.ui.txtVMaxPos.text())
-                vstep = float(self._window.ui.txtVStepPos.text())
-                vminv = float(self._window.ui.txtVMinV.text())
-                vmaxv = float(self._window.ui.txtVMaxV.text())
-                vstepv = float(self._window.ui.txtVStepV.text())
+                # uh oh, exec ahead!!! Panic!!!!
+                for txt in txtnames:
+                    exec('{} = float(self._window.ui.txt{}.text())'.format(
+                            txt.lower().split('pos')[0], txt), {'self':self}, ns)
+                    # this creates vmin, vmax, vstep, vminv, vmaxv, vstepv variables in the namespace
             except ValueError:
-                # only show error message if user has entered everything
-                txtnames = ['VMinPos', 'VMaxPos', 'VStepPos', 'VMinV', 'VMaxV', 'VStepV']
+                # only show error message if user has entered everything, so check for blank text fields
+                # exec & eval in the same function??? Watch out!!!
                 txtlist = [eval('self._window.ui.txt{}.text()'.format(_), {'self':self}) for _ in txtnames]
                 if '' not in txtlist:
                     self._window.ui.lblVScanError.setText('Bad input.')
@@ -819,35 +824,48 @@ class DaqView():
 
             if not verr:
                 # user input should be sequential, and having a step of 0 will cause a divide by zero error
-                if (vmin > vmax) or (vminv > vmaxv) or vstep == 0 or vstepv == 0 or (vmin == vmax) or (vminv == vmaxv):
+                if (ns['vmin'] > ns['vmax']) or (ns['vminv'] > ns['vmaxv']) or \
+                        ns['vmin'] == ns['vmax'] or ns['vminv'] == ns['vmaxv'] or \
+                        ns['vstep'] == 0 or ns['vstepv'] == 0:
                     self._window.ui.lblVScanError.setText('Bad values entered.')
                     self._window.ui.lblVScanError.show()
                     verr = True
 
+                if self._vercalib:
+                    if ns['vmin'] < self._dm.devices['vstepper']['calibration'][1][1] or \
+                        ns['vmax'] > self._dm.devices['vstepper']['calibration'][0][1]:
+
+                        self._window.ui.lblVScanError.setText('Values exceed device limits.')
+                        self._window.ui.lblVScanError.show()
+                        verr = True
+
             if not verr:
                 self._window.ui.lblVScanError.hide()
 
-                # otherwise we can calculate the vertical points
+                # we create the list of vertical points, undoing the user-entered values
+                steprange = np.arange(ns['vmin'], ns['vmax'], ns['vstep'])
+                volrange = np.arange(ns['vminv'], ns['vmaxv'], ns['vstepv'])
                 self._dm.devices['vstepper']['scan'] = \
-                    [calibrate(np.arange(vmin, vmax, vstep), self._dm.devices['vstepper'], reverse=True)]
+                    [calibrate(steprange, self._dm.devices['vstepper'], reverse=True)]
                 self._dm.devices['vreg']['scan'][0] = \
-                    calibrate(np.arange(vminv, vmaxv, vstepv), self._dm.devices['vreg'], reverse=True)
+                    calibrate(volrange, self._dm.devices['vreg'], reverse=True)
 
                 v_points = len(self._dm.devices['vstepper']['scan'][0]) * \
                             len(self._dm.devices['vreg']['scan'][0])
 
-        # calculate number of horizontal points
+        # calculate number of horizontal points. Same as above block.
+        # I don't like duplicating the code, but there doesn't seem to be a good
+        # way to make it generalizable since all the Qt control names are different
         if self._window.ui.rbHScan.isChecked() or self._window.ui.rbBothScan.isChecked():
+            # try to parse user input for all vertical textboxes
+            txtnames = ['HMinPos', 'HMaxPos', 'HStepPos', 'HMinV', 'HMaxV', 'HStepV']
+            ns = {} # local variables created with exec go here
             try:
-                hmin = float(self._window.ui.txtHMinPos.text())
-                hmax = float(self._window.ui.txtHMaxPos.text())
-                hstep = float(self._window.ui.txtHStepPos.text())
-                hminv = float(self._window.ui.txtHMinV.text())
-                hmaxv = float(self._window.ui.txtHMaxV.text())
-                hstepv = float(self._window.ui.txtHStepV.text())
+                for txt in txtnames:
+                    exec('{} = float(self._window.ui.txt{}.text())'.format(
+                            txt.lower().split('pos')[0], txt), {'self':self}, ns)
             except ValueError:
                 # only show error message if user has entered everything
-                txtnames = ['HMinPos', 'HMaxPos', 'HStepPos', 'HMinV', 'HMaxV', 'HStepV']
                 txtlist = [eval('self._window.ui.txt{}.text()'.format(_), {'self':self}) for _ in txtnames]
                 if '' not in txtlist:
                     self._window.ui.lblHScanError.setText('Bad input.')
@@ -855,28 +873,42 @@ class DaqView():
                 herr = True
 
             if not herr:
-                if (hmin > hmax) or (hminv > hmaxv) or hstep == 0 or hstepv == 0 or (hmin == hmax) or (hminv == hmaxv):
+                # user input should be sequential, and having a step of 0 will cause a divide by zero error
+                if (ns['hmin'] > ns['hmax']) or (ns['hminv'] > ns['hmaxv']) or \
+                        ns['hmin'] == ns['hmax'] or ns['hminv'] == ns['hmaxv'] or \
+                        ns['hstep'] == 0 or ns['hstepv'] == 0:
                     self._window.ui.lblHScanError.setText('Bad values entered.')
                     self._window.ui.lblHScanError.show()
                     herr = True
 
+                if self._horcalib:
+                    if ns['hmin'] < self._dm.devices['hstepper']['calibration'][1][1] or \
+                        ns['hmax'] > self._dm.devices['hstepper']['calibration'][0][1]:
+
+                        self._window.ui.lblHScanError.setText('Values exceed device limits.')
+                        self._window.ui.lblHScanError.show()
+                        herr = True
+
             if not herr:
                 self._window.ui.lblHScanError.hide()
 
-                # otherwise we can calculate the number of vertical points
+                # create list of horizontal points
+                steprange = np.arange(ns['hmin'], ns['hmax'], ns['hstep'])
+                volrange = np.arange(ns['hminv'], ns['hmaxv'], ns['hstepv'])
                 self._dm.devices['hstepper']['scan'] = \
-                    [calibrate(np.arange(hmin, hmax, hstep), self._dm.devices['hstepper'], reverse=True)]
+                    [calibrate(steprange, self._dm.devices['hstepper'], reverse=True)]
                 self._dm.devices['vreg']['scan'][1] = \
-                    calibrate(np.arange(hminv, hmaxv, hstepv), self._dm.devices['vreg'], reverse=True)
+                    calibrate(volrange, self._dm.devices['vreg'], reverse=True)
 
                 h_points = len(self._dm.devices['hstepper']['scan'][0]) * \
                             len(self._dm.devices['vreg']['scan'][1])
 
         if not (verr or herr):
-            # if we made it here, then we can update the text box
+            # if we made it here, then we can update the # of points label
             self._window.ui.lblScanPoints.setText(
                     'Total points: {}'.format(h_points + v_points))
 
+            # and if the user has selected a valid file, then they may start a scan
             if self._scanfile != '':
                 self._window.ui.btnStartStopScan.setEnabled(True)
 
@@ -924,6 +956,14 @@ class DaqView():
         ''' Update the total number of points when user changes scan selection '''
         self.on_scan_textbox_change()
 
+        if self._window.ui.rbBothScan.isChecked():
+            if self._scanfile != '':
+                _fname = self._scanfile[:-4]
+                self._window.ui.lblSaveFile.setText('Saving output to:\n{}_v.csv\n{}_h.csv'.format(_fname, _fname))
+        else:
+            if self._scanfile != '':
+                self._window.ui.lblSaveFile.setText('Saving output to:\n{}'.format(self._scanfile))
+
     def on_scan_status_rb_changed(self):
         ''' Update the plot when the user switches views '''
         if self._window.ui.rbVScanStatus.isChecked():
@@ -955,18 +995,28 @@ class DaqView():
                    "# Number of points: {}\n" \
                    "time,pos,v,i\n".format(kind, time, str(pts))
 
-        with open(self._scanfile, 'w') as f:
+        _file = self._scanfile
+        if self._window.ui.rbBothScan.isChecked():
+            # if we are doing 2 scans, then we need file_v.csv and file_h.csv
+            _file = self._scanfile[:-4] + '_{}.csv'.format(kind[0].lower())
+
+        with open(_file, 'w') as f:
             f.write(preamble)
 
-    def on_scan_pt(self, pt):
+    def on_scan_pt(self, pt, kind):
         ''' update the file and plot label when a new point comes in '''
         if self._window.ui.rbVScanStatus.isChecked():
             self._window.draw_scan_hist(self._daq.vdata)
         else:
             self._window.draw_scan_hist(self._daq.hdata)
 
+        _file = self._scanfile
+        if self._window.ui.rbBothScan.isChecked():
+            # if we are doing 2 scans, then we need file_v.csv and file_h.csv
+            _file = self._scanfile[:-4] + '_{}.csv'.format(kind[0].lower())
+
         # append data to text file
-        with open(self._scanfile, 'a') as f:
+        with open(_file, 'a') as f:
             f.write(','.join([str(_) for _ in pt]))
             f.write('\n')
 

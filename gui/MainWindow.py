@@ -1,14 +1,14 @@
 from PyQt5.QtWidgets import QMainWindow, QLabel, QFrame, QSizePolicy
-
 from PyQt5.QtGui import QPixmap, QPainter, QBrush, QColor, QLinearGradient, \
                         QPalette
-
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
 
 from .ui_MainWindow import Ui_MainWindow
 
 from matplotlib import cm
 import numpy as np
+
+import json
 
 class MainWindow(QMainWindow):
 
@@ -17,17 +17,16 @@ class MainWindow(QMainWindow):
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
 
+        # load/save session
+        self.ui.btnSaveSession.triggered.connect(self.save_session)
+        self.ui.btnLoadSession.triggered.connect(self.load_session)
+
         # signal connections
         self.ui.rbVCalib.toggled.connect(self.on_calib_rb_changed)
         self.ui.rbVScan.toggled.connect(self.on_scan_rb_changed)
         self.ui.rbBothScan.toggled.connect(self.on_scan_rb_changed)
 
         self.ui.lblServerMsg.hide()
-
-        # calibration page defaults
-        #self.ui.lblVCalib.setText('1. Not set\n2. Not set')
-        #self.ui.lblHCalib.setText('1. Not set\n2. Not set')
-        #self.ui.lblVolCalib.setText('1. Not set\n2. Not set')
 
         # disable calibration page manually (I don't know why I can't do this in Creator)
         self.ui.tab.setEnabled(False)
@@ -47,6 +46,65 @@ class MainWindow(QMainWindow):
         # local copy of data arrays to plot
         self._hdata = None
         self._vdata = None
+
+    ########################
+    # Session saving/loading
+    ########################
+
+    def apply_session_properties(self, settings):
+        self.resize(settings['window-width'], settings['window-height'])
+        self.move(settings['window-pos-x'], settings['window-pos-y'])
+
+        self.ui.splitScan.setSizes([settings['split-scan-first'],
+                                    settings['split-scan-second']])
+
+        self.ui.splitScanInfo.setSizes([settings['split-scaninfo-first'],
+                                        settings['split-scaninfo-second']])
+
+        textboxes = [
+                        'txtVCalibUpper', 'txtVCalibLower', 'txtHCalibUpper', 'txtHCalibLower',
+                        'txtVMinPos', 'txtVMaxPos', 'txtVStepPos', 'txtVMinV', 'txtVMaxV', 'txtVStepV',
+                        'txtHMinPos', 'txtHMaxPos', 'txtHStepPos', 'txtHMinV', 'txtHMaxV', 'txtHStepV'
+                     ]
+
+        for txt in textboxes:
+            eval('self.ui.{}.setText("{}")'.format(txt, settings[txt]))
+
+    @property
+    def session_properties(self):
+        settings = {
+                    'split-scan-first': self.ui.splitScan.sizes()[0],
+                    'split-scan-second': self.ui.splitScan.sizes()[1],
+                    'split-scaninfo-first': self.ui.splitScanInfo.sizes()[0],
+                    'split-scaninfo-second': self.ui.splitScanInfo.sizes()[1],
+                    'window-pos-x': self.pos().x(),
+                    'window-pos-y': self.pos().y(),
+                    'window-width': self.frameSize().width(),
+                    'window-height': self.frameSize().height(),
+                   }
+
+        textboxes = [
+                        'txtVCalibUpper', 'txtVCalibLower', 'txtHCalibUpper', 'txtHCalibLower',
+                        'txtVMinPos', 'txtVMaxPos', 'txtVStepPos', 'txtVMinV', 'txtVMaxV', 'txtVStepV',
+                        'txtHMinPos', 'txtHMaxPos', 'txtHStepPos', 'txtHMinV', 'txtHMaxV', 'txtHStepV'
+                     ]
+
+        for txt in textboxes:
+            settings[txt] = eval('self.ui.{}.text()'.format(txt))
+
+        return settings
+
+    def load_session(self):
+        with open('session.cfg', 'r') as f:
+            #try:
+            self.apply_session_properties(json.loads(f.read()))
+            #except:
+                # could not read JSON
+            #    pass
+
+    def save_session(self):
+        with open('session.cfg', 'w') as f:
+            json.dump(self.session_properties, f, sort_keys=True, indent=4, separators=(', ', ': '))
 
     def on_calib_rb_changed(self):
         if self.ui.rbVCalib.isChecked():
