@@ -414,6 +414,8 @@ class DeviceManager(QObject):
         self._devices['hstepper']['status'] = 'Not calibrated'
         self._devices['vstepper']['type'] = int
         self._devices['hstepper']['type'] = int
+        self._devices['vstepper']['fmt'] = '{:d}'
+        self._devices['hstepper']['fmt'] = '{:d}'
 
     def on_data(self, data):
         data = data.decode("utf-8").split(' ')
@@ -584,6 +586,13 @@ class DaqView():
             # daq object may not have been created yet
             pass
 
+        # try block for shutdown calibration should go here
+        try:
+            pass
+            # self._calibration_thread quit somehow
+        except AttributeError:
+            pass
+
         try:
             self._comm.terminate()
             self._com_thread.quit()
@@ -640,20 +649,28 @@ class DaqView():
         if None not in list(sum(self._dm.devices['vstepper']['calibration'], ())):
             self._dm.devices['vstepper']['status'] = ''
             self._dm.devices['vstepper']['unit'] = 'mm'
+            self._dm.devices['vstepper']['fmt'] = '{0:.2f}'
+            self._dm.devices['vstepper']['type'] = float
             self._vercalib = True
         else:
             self._dm.devices['vstepper']['status'] = 'Not calibrated'
             self._dm.devices['vstepper']['unit'] = 'steps'
+            self._dm.devices['vstepper']['fmt'] = '{:d}'
+            self._dm.devices['vstepper']['type'] = int
             self._vercalib = False
 
         # same for horizontal points
         if None not in list(sum(self._dm.devices['hstepper']['calibration'], ())):
             self._dm.devices['hstepper']['status'] = ''
             self._dm.devices['hstepper']['unit'] = 'mm'
+            self._dm.devices['hstepper']['fmt'] = '{0:.2f}'
+            self._dm.devices['hstepper']['type'] = float
             self._horcalib = True
         else:
             self._dm.devices['hstepper']['status'] = 'Not calibrated'
             self._dm.devices['hstepper']['unit'] = 'steps'
+            self._dm.devices['hstepper']['fmt'] = '{:d}'
+            self._dm.devices['hstepper']['type'] = int
             self._horcalib = False
 
         if self._vercalib or self._horcalib:
