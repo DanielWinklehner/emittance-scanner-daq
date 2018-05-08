@@ -22,36 +22,32 @@ from PyQt5.QtWidgets import QApplication, QFileDialog, QDialog
 
 from gui import MainWindow
 
+def flatten(lst):
+    """ Appends all nested elements in a list or tuple to a single list """
+    # python trickery to flatten
+    return list(sum(lst, ()))
+
 # need this to be a global function
-def calibrate(val, dev, reverse=False):
+def calibrate(val, device, reverse=False):
     ''' Converts a value to a device's units based on its calibration '''
-    # python trickery to flatten a list of tuples
-    if None in list(sum(dev['calibration'], ())):
+    if None in flatten(device['calibration']):
         # if calibration not set, clean up argument & return
         if isinstance(val, np.ndarray):
             # we passed in a numpy array, so use numpy syntax
-            return np.around(val, decimals=4).astype(dev['type'])
+            return np.around(val, decimals=4).astype(device['type'])
         else:
             # we passed in a single value, so use default python syntax
-            return dev['type'](val)
+            return device['type'](val)
 
-    pt1 = dev['calibration'][0]
-    pt2 = dev['calibration'][1]
+    # sort calibration points by x value
+    pts = sorted(device['calibration'], key=lambda x: x[0])
+    xs = [pt[0] for pt in pts]
+    ys = [pt[1] for pt in pts]
 
-    # find slope
-    m = (pt2[1] - pt1[1]) / (pt2[0] - pt1[0])
-
-    # return linear extrapolation
     if reverse:
-        # if true, assume the user passed a calibrated value and wants the
-        # device value back, make sure it is the right data type
-        if isinstance(val, np.ndarray):
-            return np.around(pt1[0] + (val - pt1[1]) / m, decimals=4).astype(dev['type'])
-        else:
-            return dev['type'](pt1[0] + (val - pt1[1]) / m)
+        return np.around(np.interp(val, ys, xs), decimals=4).astype(device['type'])
     else:
-        # return the calibrated value, has to be a float
-        return m * (val - pt1[0]) + pt1[1]
+        return device['type'](np.interp(val, xs, ys))
 
 
 class CouldNotConnectError(Exception):
@@ -646,7 +642,7 @@ class DaqView():
         ''' Determines if certain devices are calibrated or not '''
         # are both vertical points set?
         # python trickery to flatten a list of tuples
-        if None not in list(sum(self._dm.devices['vstepper']['calibration'], ())):
+        if None not in flatten(self._dm.devices['vstepper']['calibration']):
             self._dm.devices['vstepper']['status'] = ''
             self._dm.devices['vstepper']['unit'] = 'mm'
             self._dm.devices['vstepper']['fmt'] = '{0:.2f}'
@@ -660,7 +656,7 @@ class DaqView():
             self._vercalib = False
 
         # same for horizontal points
-        if None not in list(sum(self._dm.devices['hstepper']['calibration'], ())):
+        if None not in flatten(self._dm.devices['hstepper']['calibration']):
             self._dm.devices['hstepper']['status'] = ''
             self._dm.devices['hstepper']['unit'] = 'mm'
             self._dm.devices['hstepper']['fmt'] = '{0:.2f}'
