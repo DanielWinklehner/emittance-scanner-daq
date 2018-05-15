@@ -4,9 +4,8 @@ import socket
 import time
 import threading
 import sys
-import subprocess # for running usb script on linux
 from inspect import isclass
-# from collections import OrderedDict
+from serial.tools import list_ports
 
 from devices.pico import Pico
 from devices.stepper import Stepper
@@ -26,31 +25,29 @@ s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.bind((TCP_IP, TCP_PORT))
 s.listen(1)
 
+serial_mapping = {
+    'a': 'pico',
+    '8212017125346': 'vstepper',
+    'b': 'hstepper',
+    'c': 'vreg',
+}
+
 # device dict, default assignment to the respective class
 devices = {
-            'pico': {'device': Pico, 'serial': 'Controller', 'thread': None, 'port': 'COM6'},
-            'vstepper': {'device': Stepper, 'serial': '8212017125346', 'thread': None, 'port': 'COM5'},
+            'pico': {'device': Pico, 'serial': 'Controller', 'thread': None, 'port': ''},
+            'vstepper': {'device': Stepper, 'serial': '8212017125346', 'thread': None, 'port': ''},
             'hstepper': {'device': Stepper, 'serial': 'aaa', 'thread': None, 'port': ''},
             'vreg': {'device': Vreg, 'serial': 'aaa', 'thread': None, 'port': ''}
 }
 
-'''
-# poll usb ports to associate devices
-proc = subprocess.Popen('/home/mist-1/Work/server/usb.sh', stdout=subprocess.PIPE, shell=True)
-output = proc.stdout.read().strip()
-
-# Loop through all found devices
-for line in output.split("\n"):
-    port, raw_info = line.split(" - ")
-    serial_number = raw_info.split("_")[-1]
-
-    # if a serial number matches, instantiate a new object
-    for device_name, info in devices.items():
-        if info['serial'] == serial_number:
-            info['device'] = info['device'](port, debug=debug)
-            break
-'''
-# TODO windows method hard-codes the ports... for now
+# fill in port field in the main device dictionary by matching serial numbers detected in Windows
+for device_info in list_ports.comports():
+    try:
+        devices[serial_mapping[device_info.serial_number]]['port'] = device_info.device
+    except KeyError:
+        print('Found serial number {} but it is not associated with any scanner-associated devices.'.format(
+            device_info.serial_number))
+    
 for device_name, info in devices.items():
     if info['port'] != '':
         info['device'] = info['device'](info['port'], debug=debug)
