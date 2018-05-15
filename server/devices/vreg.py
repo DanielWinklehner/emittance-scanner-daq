@@ -4,7 +4,8 @@ import nidaqmx
 
 from devices.serial_com import fast_read
 
-class Vreg():
+
+class Vreg:
     def __init__(self, debug=False):
 
         self._terminate = False
