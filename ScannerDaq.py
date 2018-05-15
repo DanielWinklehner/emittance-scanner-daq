@@ -23,7 +23,7 @@ from PyQt5.QtWidgets import QApplication, QFileDialog, QDialog
 from gui import MainWindow
 
 
-def close_enough(self, val1, val2, epsilon=1e-6):
+def close_enough(val1, val2, epsilon=1e-6):
     """ Really dumb function for comparing floats """
     return abs(val1 - val2) < epsilon
 
@@ -137,43 +137,50 @@ class Daq(QObject):
 
         prev_val = self._devices[stepper]['value']
         # stepper motor is traditionally slower so try that first
-        while not close_enough(self._devices[stepper]['value'], target):
+        while not close_enough(self._devices[stepper]['value'], int(target), epsilon=1):
             # server expects setall <v stepper value> <h stepper value> <vreg value>s
             # only want to send command if we are stuck
-
+            print('here', target)
             # for exiting mid-scan
             if self._terminate:
                 return
 
             if self._devices[stepper]['value'] == prev_val:
+                if vtarget is not None:
+                    vtarget = int(vtarget)
+                if htarget is not None:
+                    htarget = int(htarget)
+
                 msg = 'setall {} {} {}'.format(vtarget, htarget, voltarget)
                 self.sig_msg.emit(msg)
-            time.sleep(0.1)
+            time.sleep(0.5)
 
         # now send some more commands if we are not at voltage target
         if voltarget is None:
             return
 
+        #TODO
         prev_val = self._devices['vreg']['value']
-        while not close_enough(self._devices['vreg']['value'], voltarget):
+        #while not close_enough(self._devices['vreg']['value'], voltarget, epsilon=0.05):
+        print('vreg', voltarget)
+        # for exiting mid-scan
+        if self._terminate:
+            return
 
-            # for exiting mid-scan
-            if self._terminate:
-                return
-
-            if self._devices['vreg']['value'] == prev_val:
-                msg = 'setall {} {} {}'.format(None, None, voltarget)
-                self.sig_msg.emit(msg)
-            time.sleep(0.1)
+        if self._devices['vreg']['value'] == prev_val:
+            msg = 'setall {} {} {}'.format(None, None, voltarget)
+            self.sig_msg.emit(msg)
+        time.sleep(0.5)
 
     def scan(self, stepper, stepper_pts, vreg_pts):
 
         # make sure the other stepper is parked
         other = 'hstepper' if stepper == 'vstepper' else 'vstepper'
         other_prefix = 'hmove ' if stepper == 'vstepper' else 'vmove '
-        self.sig_msg.emit(other_prefix + 'SL SP')
-        while self._devices[other]['flag'] != 'MAX':
-            time.sleep(0.1)
+        #TODO
+        #self.sig_msg.emit(other_prefix + 'SL SP')
+        #while self._devices[other]['flag'] != 'MAX':
+        #    time.sleep(0.1)
 
         vtarget, htarget = (stepper_pts[0], None) if stepper == 'vstepper' else (None, stepper_pts[0])
         targetv = vreg_pts[0]
@@ -207,7 +214,7 @@ class Daq(QObject):
                 t = dt.datetime.strftime(dt.datetime.now(), '%Y-%m-%d %H:%M:%S.%f')
                 currents = []
                 for k in range(50):
-                    currents.append(self._devices['pico']['value'])
+                    currents.append(np.random.normal(-1, 1, 1)[0]) # self._devices['pico']['value'])
                     time.sleep(0.001)
 
                 current = np.mean(currents)
@@ -511,12 +518,12 @@ class DaqView:
         self._dm.devices['hstepper']['label'] = self._window.lblHor
         self._dm.devices['vreg']['label'] = self._window.lblV
 
-        self.set_vreg_calibration()
+        #self.set_vreg_calibration()
 
         # testing block
-        # self._dm.devices['vstepper']['calibration'] = [(50000, 20), (-50000, -20)]
+        self._dm.devices['vstepper']['calibration'] = [(400000, 20), (0, -20)]
         # self._dm.devices['hstepper']['calibration'] = [(50000, 20), (-50000, -20)]
-        # self._vercalib = True
+        self._vercalib = True
         # self._horcalib = True
 
         self.check_calibration()
@@ -888,7 +895,7 @@ class DaqView:
         if self._window.ui.rbHScan.isChecked() or self._window.ui.rbBothScan.isChecked():
             # try to parse user input for all vertical textboxes
             txtnames = ['HMinPos', 'HMaxPos', 'HStepPos', 'HMinV', 'HMaxV', 'HStepV']
-            ns = {} # local variables created with exec go here
+            ns = {}  # local variables created with exec go here
             try:
                 for txt in txtnames:
                     exec('{} = float(self._window.ui.txt{}.text())'.format(
