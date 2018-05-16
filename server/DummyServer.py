@@ -141,7 +141,9 @@ def poll():
 def vset(arg):
     # will be sent command 'vset ####'
     try:
-        devices['vreg'] = min(max(float(arg.split(' ')[1]), -10), 10)
+        val = min(max(float(arg.split(' ')[1]), -10), 10)
+        # return milivolts of HV output plus some offset
+        devices['vreg'] = 0.04 + (val * 1.5) / 10.
     except:
         pass
 

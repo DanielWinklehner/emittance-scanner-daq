@@ -25,6 +25,20 @@ from PyQt5.QtWidgets import QApplication, QFileDialog, QDialog, \
 from gui import MainWindow
 
 
+def arange_inclusive(start, stop, step, decimals=6):
+    """ Inclusive range of values given start, stop and step """
+    res = [start]
+    step_num = 1
+    while res[-1] < stop:
+        tmp = round(start + step_num * step, decimals)
+        if tmp > stop:
+            break
+        res.append(tmp)
+        step_num += 1
+
+    return np.asarray(res)
+
+
 def close_enough(val1, val2, epsilon=1e-6):
     """ Really dumb function for comparing floats """
     return abs(val1 - val2) < epsilon
@@ -37,7 +51,7 @@ def flatten(lst):
 
 
 # need this to be a global function
-def calibrate(val, device, reverse=False):
+def calibrate(val, device, reverse=False, alt=False):
     """ Converts a value to a device's units based on its calibration """
     if None in flatten(device['calibration']) or len(device['calibration']) < 2:
         # if calibration not set, clean up argument & return
@@ -53,27 +67,20 @@ def calibrate(val, device, reverse=False):
     xs = [pt[0] for pt in pts]
     ys = [pt[1] for pt in pts]
 
+    # voltage regulator has two calibrations for read and set voltages
+    # use the alt flag to switch between them
+    if alt:
+        xs = [pt[2] for pt in pts]
+
     # for only the voltage regulator, the read value is different than the set
     # value in base units. The third index of each calibration point holds the set value
     # for this device.
 
-
     if reverse:
-        # convert kV to set voltage
-        if device['name'] == 'Voltage':
-            xs = [pt[2] for pt in pts]
-            ys = [pt[1] for pt in pts]
+        xs, ys = ys, xs
 
-        f = interpolate.interp1d(ys, xs, fill_value="extrapolate")
-        return np.around(f(val), decimals=4).astype(device['type'])
-    else:
-        # convert read voltage to kV
-        if device['name'] == 'Voltage':
-            xs = [pt[0] for pt in pts]
-            ys = [pt[1] for pt in pts]
-
-        f = interpolate.interp1d(xs, ys, fill_value="extrapolate")
-        return device['type'](f(val))
+    f = interpolate.interp1d(xs, ys, fill_value="extrapolate")
+    return np.around(f(val), decimals=4).astype(device['type'])
 
 
 def clear_layout(layout):
@@ -131,7 +138,8 @@ class Daq(QObject):
             for i, vtarget in enumerate(self._v_scan_pts[0]):
                 for j, vtargetv in enumerate(self._v_scan_pts[1]):
                     self._vdata[i * vsteps + j]['pos'] = calibrate(vtarget, self._devices['vstepper'])
-                    self._vdata[i * vsteps + j]['v'] = calibrate(vtargetv, self._devices['vreg'])
+                    # convert set vals -> kV instead of read vals -> kV, so use alt flag
+                    self._vdata[i * vsteps + j]['v'] = calibrate(vtargetv, self._devices['vreg'], alt=True)
 
             # initialize currents to nan so that the gui can draw null bins on 2d histogram
             self._vdata['i'] = np.nan
@@ -153,7 +161,7 @@ class Daq(QObject):
             for i, htarget in enumerate(self._h_scan_pts[0]):
                 for j, htargetv in enumerate(self._h_scan_pts[1]):
                     self._hdata[i * hsteps + j]['pos'] = calibrate(htarget, self._devices['hstepper'])
-                    self._hdata[i * hsteps + j]['v'] = calibrate(htargetv, self._devices['vreg'])
+                    self._hdata[i * hsteps + j]['v'] = calibrate(htargetv, self._devices['vreg'], alt=True)
 
             # initialize currents to nan so that the gui can draw null bins on 2d histogram
             self._hdata['i'] = np.nan
@@ -190,15 +198,20 @@ class Daq(QObject):
             return
 
         prev_val = self._devices['vreg']['value']
-        #while not close_enough(self._devices['vreg']['value'], voltarget, epsilon=0.05):
-        # for exiting mid-scan
-        if self._terminate:
-            return
+        # convert set voltage to kV, then kV to read voltage
+        calib_val = calibrate(
+            calibrate(voltarget, self._devices['vreg'], alt=True),
+            self._devices['vreg'], reverse=True)
+            
+        while not close_enough(self._devices['vreg']['value'], calib_val, epsilon=0.01):
+            # for exiting mid-scan
+            if self._terminate:
+                return
 
-        if self._devices['vreg']['value'] == prev_val:
-            msg = 'setall {} {} {}'.format(None, None, voltarget)
-            self.sig_msg.emit(msg)
-        time.sleep(0.5)
+            if self._devices['vreg']['value'] == prev_val:
+                msg = 'setall {} {} {}'.format(None, None, voltarget)
+                self.sig_msg.emit(msg)
+            time.sleep(0.5)
 
     def scan(self, stepper, stepper_pts, vreg_pts):
 
@@ -255,9 +268,10 @@ class Daq(QObject):
 
         if not self._terminate:
             # move stepper to parked position -- calibration point 1 is tuple with (steps, mm), use steps
+            # also zero the voltage
             target = self._devices[stepper]['calibration'][0][0]
-            self.safe_move(target, None, None) if stepper == 'vstepper' else \
-                self.safe_move(None, target, None)
+            self.safe_move(target, None, 0) if stepper == 'vstepper' else \
+                self.safe_move(None, target, 0)
 
     def run(self):
         # do vertical scan
@@ -858,14 +872,14 @@ class DaqView:
             return
 
         # make sure this calibration point is unique
-        current_value = float('{0:.2f}'.format(self._dm.devices['vreg']['value']))
-        if current_value in [pt[0] for pt in self._dm.devices['vreg']['calibration']]:
+        read_val = float('{0:.2f}'.format(self._dm.devices['vreg']['value']))
+        if read_val in [pt[0] for pt in self._dm.devices['vreg']['calibration']]:
             # TODO: Meaningful error message
             return
 
         # otherwise add the point
         # format is: (what server reads, what user measures, what user sets)
-        self._dm.devices['vreg']['calibration'].append((current_value, val_in_kv, val))
+        self._dm.devices['vreg']['calibration'].append((read_val, val_in_kv, val))
 
         # update the gui
         self.update_vreg_calibration()
@@ -978,12 +992,13 @@ class DaqView:
                 self._window.ui.lblVScanError.hide()
 
                 # we create the list of vertical points, undoing the user-entered values
-                steprange = np.arange(ns['vmin'], ns['vmax'], ns['vstep'])
-                volrange = np.arange(ns['vminv'], ns['vmaxv'], ns['vstepv'])
+                steprange = arange_inclusive(ns['vmin'], ns['vmax'], ns['vstep'])
+                volrange = arange_inclusive(ns['vminv'], ns['vmaxv'], ns['vstepv'])
                 self._dm.devices['vstepper']['scan'] = \
                     [calibrate(steprange, self._dm.devices['vstepper'], reverse=True)]
+                # alt flag indicates to use the set voltage instead of the read voltage
                 self._dm.devices['vreg']['scan'][0] = \
-                    calibrate(volrange, self._dm.devices['vreg'], reverse=True)
+                    calibrate(volrange, self._dm.devices['vreg'], reverse=True, alt=True)
 
                 v_points = len(self._dm.devices['vstepper']['scan'][0]) * \
                             len(self._dm.devices['vreg']['scan'][0])
@@ -1028,12 +1043,12 @@ class DaqView:
                 self._window.ui.lblHScanError.hide()
 
                 # create list of horizontal points
-                steprange = np.arange(ns['hmin'], ns['hmax'], ns['hstep'])
-                volrange = np.arange(ns['hminv'], ns['hmaxv'], ns['hstepv'])
+                steprange = arange_inclusive(ns['hmin'], ns['hmax'], ns['hstep'])
+                volrange = arange_inclusive(ns['hminv'], ns['hmaxv'], ns['hstepv'])
                 self._dm.devices['hstepper']['scan'] = \
                     [calibrate(steprange, self._dm.devices['hstepper'], reverse=True)]
                 self._dm.devices['vreg']['scan'][1] = \
-                    calibrate(volrange, self._dm.devices['vreg'], reverse=True)
+                    calibrate(volrange, self._dm.devices['vreg'], reverse=True, alt=True)
 
                 h_points = len(self._dm.devices['hstepper']['scan'][0]) * \
                             len(self._dm.devices['vreg']['scan'][1])
