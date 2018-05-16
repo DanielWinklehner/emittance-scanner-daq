@@ -53,14 +53,25 @@ def calibrate(val, device, reverse=False):
     xs = [pt[0] for pt in pts]
     ys = [pt[1] for pt in pts]
 
-    # if the value we passed is out of range, then we need to extrapolate based on last-known slope
-    last_slope = (ys[-1] - ys[-2]) / (xs[-1] - xs[-2])
+    # for only the voltage regulator, the read value is different than the set
+    # value in base units. The third index of each calibration point holds the set value
+    # for this device.
 
 
     if reverse:
+        # convert kV to set voltage
+        if device['name'] == 'Voltage':
+            xs = [pt[2] for pt in pts]
+            ys = [pt[1] for pt in pts]
+
         f = interpolate.interp1d(ys, xs, fill_value="extrapolate")
         return np.around(f(val), decimals=4).astype(device['type'])
     else:
+        # convert read voltage to kV
+        if device['name'] == 'Voltage':
+            xs = [pt[0] for pt in pts]
+            ys = [pt[1] for pt in pts]
+
         f = interpolate.interp1d(xs, ys, fill_value="extrapolate")
         return device['type'](f(val))
 
@@ -179,15 +190,15 @@ class Daq(QObject):
             return
 
         prev_val = self._devices['vreg']['value']
-        while not close_enough(self._devices['vreg']['value'], voltarget, epsilon=0.05):
-            # for exiting mid-scan
-            if self._terminate:
-                return
+        #while not close_enough(self._devices['vreg']['value'], voltarget, epsilon=0.05):
+        # for exiting mid-scan
+        if self._terminate:
+            return
 
-            if self._devices['vreg']['value'] == prev_val:
-                msg = 'setall {} {} {}'.format(None, None, voltarget)
-                self.sig_msg.emit(msg)
-            time.sleep(0.5)
+        if self._devices['vreg']['value'] == prev_val:
+            msg = 'setall {} {} {}'.format(None, None, voltarget)
+            self.sig_msg.emit(msg)
+        time.sleep(0.5)
 
     def scan(self, stepper, stepper_pts, vreg_pts):
 
@@ -231,7 +242,7 @@ class Daq(QObject):
                 t = dt.datetime.strftime(dt.datetime.now(), '%Y-%m-%d %H:%M:%S.%f')
                 currents = []
                 for k in range(50):
-                    currents.append(np.random.normal(-1, 1, 1)[0]) # self._devices['pico']['value'])
+                    currents.append(self._devices['pico']['value'])
                     time.sleep(0.001)
 
                 current = np.mean(currents)
@@ -832,6 +843,13 @@ class DaqView:
         self._comm.add_message_to_queue('vset vset {0:.2f}'.format(val))
 
     def add_vreg_calibration_point(self):
+        # read value from text box
+        try:
+            val = float(self._window.ui.txtSetVreg.text())
+        except ValueError:
+            # TODO: Meaningful error message
+            return
+
         # see what the user entered in the conversion text box
         try:
             val_in_kv = float(self._window.ui.txtVregCalib.text())
@@ -840,23 +858,24 @@ class DaqView:
             return
 
         # make sure this calibration point is unique
-        current_value = self._dm.devices['vreg']['value']
+        current_value = float('{0:.2f}'.format(self._dm.devices['vreg']['value']))
         if current_value in [pt[0] for pt in self._dm.devices['vreg']['calibration']]:
             # TODO: Meaningful error message
             return
 
         # otherwise add the point
-        self._dm.devices['vreg']['calibration'].append((current_value, val_in_kv))
+        # format is: (what server reads, what user measures, what user sets)
+        self._dm.devices['vreg']['calibration'].append((current_value, val_in_kv, val))
 
         # update the gui
         self.update_vreg_calibration()
-
 
     def remove_vreg_calibration_point(self, idx):
         del self._dm.devices['vreg']['calibration'][idx]
         self.update_vreg_calibration()
 
     def update_vreg_calibration(self):
+        self.check_calibration()
         # clear all layouts
         for layout in self._vreg_layouts:
             clear_layout(layout)
@@ -865,7 +884,7 @@ class DaqView:
         # add current set of calibration points
         for i, point in enumerate(self._dm.devices['vreg']['calibration']):
 
-            lbl = QLabel('{}. {} V = {} kV'.format(i + 1, point[0], point[1]))
+            lbl = QLabel('{}. {} V (read) = {} kV = {} V (set)'.format(i + 1, point[0], point[1], point[2]))
             btn = QPushButton('Delete')
             layout = QHBoxLayout()
 
