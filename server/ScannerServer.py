@@ -47,7 +47,7 @@ for device_info in list_ports.comports():
     except KeyError:
         print('Found serial number {} but it is not associated with any scanner-associated devices.'.format(
             device_info.serial_number))
-    
+
 for device_name, info in devices.items():
     if info['port'] != '':
         info['device'] = info['device'](info['port'], debug=debug)
@@ -154,6 +154,13 @@ try:
         # inner loop to handle messages with current connection
         while True:
             data = conn.recv(BUFFER_SIZE)
+            # try to catch communication error
+            # too fast communication can result in a poll message being appended
+            # to a set command. Check if this is the case
+            if len(data) > 4 and data[-4:] == 'poll':
+                print('Communication too fast! Data is: {}'.format(data))
+                continue
+
             if not data:
                 break
             print("received data: {}".format(data))

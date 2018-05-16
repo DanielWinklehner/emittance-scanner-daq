@@ -33,7 +33,7 @@ class Vreg:
             volt = max(min(10.0, volt), -10.0)
             if self._debug:
                 print(volt)
-        self._write_task.write(volt, auto_start = True)
+            self._write_task.write(volt, auto_start = True)
 
     def run(self):
         while not self._terminate:

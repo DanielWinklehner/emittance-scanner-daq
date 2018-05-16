@@ -16,9 +16,11 @@ from collections import deque
 
 import numpy as np
 import datetime as dt
+from scipy import interpolate
 
 from PyQt5.QtCore import QObject, QThread, QTimer, pyqtSignal, pyqtSlot
-from PyQt5.QtWidgets import QApplication, QFileDialog, QDialog
+from PyQt5.QtWidgets import QApplication, QFileDialog, QDialog, \
+                            QPushButton, QLabel, QHBoxLayout
 
 from gui import MainWindow
 
@@ -37,7 +39,7 @@ def flatten(lst):
 # need this to be a global function
 def calibrate(val, device, reverse=False):
     """ Converts a value to a device's units based on its calibration """
-    if None in flatten(device['calibration']):
+    if None in flatten(device['calibration']) or len(device['calibration']) < 2:
         # if calibration not set, clean up argument & return
         if isinstance(val, np.ndarray):
             # we passed in a numpy array, so use numpy syntax
@@ -51,10 +53,28 @@ def calibrate(val, device, reverse=False):
     xs = [pt[0] for pt in pts]
     ys = [pt[1] for pt in pts]
 
+    # if the value we passed is out of range, then we need to extrapolate based on last-known slope
+    last_slope = (ys[-1] - ys[-2]) / (xs[-1] - xs[-2])
+
+
     if reverse:
-        return np.around(np.interp(val, ys, xs), decimals=4).astype(device['type'])
+        f = interpolate.interp1d(ys, xs, fill_value="extrapolate")
+        return np.around(f(val), decimals=4).astype(device['type'])
     else:
-        return device['type'](np.interp(val, xs, ys))
+        f = interpolate.interp1d(xs, ys, fill_value="extrapolate")
+        return device['type'](f(val))
+
+
+def clear_layout(layout):
+    """ Remove all Qt widgets from a layout """
+    if layout is not None:
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.setParent(None)
+            else:
+                clear_layout(item.layout())
 
 
 class CouldNotConnectError(Exception):
@@ -140,7 +160,6 @@ class Daq(QObject):
         while not close_enough(self._devices[stepper]['value'], int(target), epsilon=1):
             # server expects setall <v stepper value> <h stepper value> <vreg value>s
             # only want to send command if we are stuck
-            print('here', target)
             # for exiting mid-scan
             if self._terminate:
                 return
@@ -159,18 +178,16 @@ class Daq(QObject):
         if voltarget is None:
             return
 
-        #TODO
         prev_val = self._devices['vreg']['value']
-        #while not close_enough(self._devices['vreg']['value'], voltarget, epsilon=0.05):
-        print('vreg', voltarget)
-        # for exiting mid-scan
-        if self._terminate:
-            return
+        while not close_enough(self._devices['vreg']['value'], voltarget, epsilon=0.05):
+            # for exiting mid-scan
+            if self._terminate:
+                return
 
-        if self._devices['vreg']['value'] == prev_val:
-            msg = 'setall {} {} {}'.format(None, None, voltarget)
-            self.sig_msg.emit(msg)
-        time.sleep(0.5)
+            if self._devices['vreg']['value'] == prev_val:
+                msg = 'setall {} {} {}'.format(None, None, voltarget)
+                self.sig_msg.emit(msg)
+            time.sleep(0.5)
 
     def scan(self, stepper, stepper_pts, vreg_pts):
 
@@ -411,7 +428,7 @@ class DeviceManager(QObject):
         self._devices['pico']['unit'] = 'A'
         self._devices['vstepper']['unit'] = 'steps'
         self._devices['hstepper']['unit'] = 'steps'
-        self._devices['vreg']['unit'] = 'kV'
+        self._devices['vreg']['unit'] = 'V'
 
         # exceptions to default values
         self._devices['pico']['fmt'] = '{0:.4e}'
@@ -421,6 +438,8 @@ class DeviceManager(QObject):
         self._devices['hstepper']['type'] = int
         self._devices['vstepper']['fmt'] = '{:d}'
         self._devices['hstepper']['fmt'] = '{:d}'
+        self._devices['vreg']['status'] = 'Not calibrated'
+        self._devices['vreg']['calibration'] = []
 
     def on_data(self, data):
         data = data.decode("utf-8").split(' ')
@@ -476,7 +495,7 @@ class DaqView:
         self._window.btnConnect.clicked.connect(self.connect_to_server)
         self._window.ui.btnExit.triggered.connect(self.exit)
 
-        # stepper manual controls
+        # stepper manual controls & test buttons
         self._window.ui.btnRetract.clicked.connect(lambda: self.stepper_com('SL SP'))
         self._window.ui.btnExtend.clicked.connect(lambda: self.stepper_com('SL - SP'))
         self._window.ui.btnStop.clicked.connect(lambda: self.stepper_com('\x1b')) # esc key
@@ -484,6 +503,8 @@ class DaqView:
         # calibration buttons
         self._window.ui.btnStartVCalib.clicked.connect(self.start_vstepper_calibration)
         self._window.ui.btnStartHCalib.clicked.connect(self.start_hstepper_calibration)
+        self._window.ui.btnSetVreg.clicked.connect(self.set_vreg)
+        self._window.ui.btnAddVregPoint.clicked.connect(self.add_vreg_calibration_point)
 
         # scan buttons
         self._window.ui.btnChooseFile.clicked.connect(self.choose_file)
@@ -508,6 +529,7 @@ class DaqView:
         self._vercalib = False
         self._horcalib = False
         self._vregcalib = False
+        self._vreg_layouts = []  # list of Qt layouts created for each calibration point
 
         # device manager class allows devices to be updated independently of the gui thread
         self._dm = DeviceManager()
@@ -518,12 +540,10 @@ class DaqView:
         self._dm.devices['hstepper']['label'] = self._window.lblHor
         self._dm.devices['vreg']['label'] = self._window.lblV
 
-        #self.set_vreg_calibration()
-
         # testing block
-        self._dm.devices['vstepper']['calibration'] = [(400000, 20), (0, -20)]
+        # self._dm.devices['vstepper']['calibration'] = [(400000, 20), (0, -20)]
         # self._dm.devices['hstepper']['calibration'] = [(50000, 20), (-50000, -20)]
-        self._vercalib = True
+        # self._vercalib = True
         # self._horcalib = True
 
         self.check_calibration()
@@ -540,9 +560,9 @@ class DaqView:
         self.update_display_values()
 
     def test_vreg(self):
-        val = np.random.normal(loc=0, scale=10)
+        val = np.random.uniform(-1, 1, 1)[0]
         self._comm.add_message_to_queue('vset vset {0:.2f}'.format(val))
-        print(val)
+        print('Setting voltage regulator to {0:.2f}'.format(val))
 
     def connect_to_server(self):
 
@@ -620,7 +640,7 @@ class DaqView:
         # reset devices
         self._dm.devices['vstepper']['calibration'] = [(None, None), (None, None)]
         self._dm.devices['hstepper']['calibration'] = [(None, None), (None, None)]
-        self._dm.devices['vreg']['calibration'] = [(None, None), (None, None)]
+        self._dm.devices['vreg']['calibration'] = []
 
         self.check_calibration()
 
@@ -654,7 +674,8 @@ class DaqView:
 
     def check_calibration(self):
         """ Determines if certain devices are calibrated or not """
-        if None not in flatten(self._dm.devices['vreg']['calibration']):
+        #if None not in flatten(self._dm.devices['vreg']['calibration']):
+        if len(self._dm.devices['vreg']['calibration']) > 1:
             self._dm.devices['vreg']['status'] = ''
             self._dm.devices['vreg']['unit'] = 'kV'
             self._vregcalib = True
@@ -798,6 +819,65 @@ class DaqView:
         self._window.tabCalib.setEnabled(True)
         self._window.tabScan.setEnabled(True)
         self._window.ui.gbSteppers.setEnabled(True)
+
+    def set_vreg(self):
+        # read value from text box
+        try:
+            val = float(self._window.ui.txtSetVreg.text())
+        except ValueError:
+            # TODO: Meaningful error message
+            return
+
+        # set the voltage regulator on the server
+        self._comm.add_message_to_queue('vset vset {0:.2f}'.format(val))
+
+    def add_vreg_calibration_point(self):
+        # see what the user entered in the conversion text box
+        try:
+            val_in_kv = float(self._window.ui.txtVregCalib.text())
+        except ValueError:
+            # TODO: Meaningful error messag
+            return
+
+        # make sure this calibration point is unique
+        current_value = self._dm.devices['vreg']['value']
+        if current_value in [pt[0] for pt in self._dm.devices['vreg']['calibration']]:
+            # TODO: Meaningful error message
+            return
+
+        # otherwise add the point
+        self._dm.devices['vreg']['calibration'].append((current_value, val_in_kv))
+
+        # update the gui
+        self.update_vreg_calibration()
+
+
+    def remove_vreg_calibration_point(self, idx):
+        del self._dm.devices['vreg']['calibration'][idx]
+        self.update_vreg_calibration()
+
+    def update_vreg_calibration(self):
+        # clear all layouts
+        for layout in self._vreg_layouts:
+            clear_layout(layout)
+            self._window.ui.gbVolCalib.layout().removeItem(layout)
+
+        # add current set of calibration points
+        for i, point in enumerate(self._dm.devices['vreg']['calibration']):
+
+            lbl = QLabel('{}. {} V = {} kV'.format(i + 1, point[0], point[1]))
+            btn = QPushButton('Delete')
+            layout = QHBoxLayout()
+
+            btn.clicked.connect(lambda: self.remove_vreg_calibration_point(i))
+
+            layout.addWidget(lbl)
+            layout.addStretch()
+            layout.addWidget(btn)
+
+            self._window.ui.gbVolCalib.layout().insertLayout(5 + i, layout)
+
+            self._vreg_layouts.append(layout)
 
     def set_vreg_calibration(self):
         # Don't know what to do here yet.

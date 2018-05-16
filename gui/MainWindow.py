@@ -217,15 +217,19 @@ class MainWindow(QMainWindow):
         prev_y = 0
 
         for i in range(len(data)):
+            perc_pos = 0
+            if min_pos != max_pos:
+                # avoid divide by zero error if only one position point
+                perc_pos = (data[i]['pos'] - min_pos) / (max_pos - min_pos)
 
-            perc_pos = (data[i]['pos'] - min_pos) / (max_pos - min_pos)
-            perc_v = (data[i]['v'] - min_v) / (max_v - min_v)
-
-            if max_v == min_v or max_pos == min_pos or max_current == min_current:
-                continue
+            perc_v = 0
+            if max_v != min_v:
+                perc_v = (data[i]['v'] - min_v) / (max_v - min_v)
 
             if not np.isnan(data[i]['i'][0]):
-                perc_current = (data[i]['i'] - min_current) / (max_current - min_current)
+                perc_current = 0
+                if max_current != min_current:
+                    perc_current = (data[i]['i'] - min_current) / (max_current - min_current)
                 r, g, b, _ = (int(255 * q) for q in self._scan_color_scale(int(perc_current * 255)))
                 brush = QBrush(QColor(r, g, b))
             else:
