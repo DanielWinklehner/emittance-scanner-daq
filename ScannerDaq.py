@@ -527,8 +527,8 @@ class DaqView:
         self._window.ui.btnStop.clicked.connect(lambda: self.stepper_com('\x1b')) # esc key
 
         # calibration buttons
-        self._window.ui.btnStartVCalib.clicked.connect(self.start_vstepper_calibration)
-        self._window.ui.btnStartHCalib.clicked.connect(self.start_hstepper_calibration)
+        self._window.ui.btnStartVCalib.clicked.connect(lambda: self.start_stepper_calibration('vstepper'))
+        self._window.ui.btnStartHCalib.clicked.connect(lambda: self.start_stepper_calibration('hstepper'))
         self._window.ui.btnSetVreg.clicked.connect(self.set_vreg)
         self._window.ui.btnAddVregPoint.clicked.connect(self.add_vreg_calibration_point)
 
@@ -848,10 +848,25 @@ class DaqView:
             # we pass all the checks, so hide the error label
             controls['error'].hide()
 
-    def start_vstepper_calibration(self):
+    def start_stepper_calibration(self, device_name):
+        """ Check user entry and launch stepper calibration thread """
+        vertical_settings = {
+            'upper': self._window.ui.txtVCalibUpper,
+            'lower': self._window.ui.txtVCalibLower,
+            'device': 'vstepper'
+        }
+
+        horizontal_settings = {
+            'upper': self._window.ui.txtHCalibUpper,
+            'lower': self._window.ui.txtHCalibLower,
+            'device': 'hstepper'
+        }
+
+        settings = vertical_settings if device_name == 'vstepper' else horizontal_settings
+
         try:
-            upper = float(self._window.ui.txtVCalibUpper.text().strip())
-            lower = float(self._window.ui.txtVCalibLower.text().strip())
+            upper = float(settings['upper'].text().strip())
+            lower = float(settings['lower'].text().strip())
         except ValueError:
             return
 
@@ -863,29 +878,7 @@ class DaqView:
 
         self._calibration_thread = threading.Thread(
                 target=self.set_stepper_calibration,
-                args=('vstepper', upper, lower)
-            )
-        self._calibration_thread.start()
-        self._window.tabCalib.setEnabled(False)
-        self._window.tabScan.setEnabled(False)
-        self._window.ui.gbSteppers.setEnabled(False)
-
-    def start_hstepper_calibration(self):
-        try:
-            upper = float(self._window.ui.txtVCalibUpper.text().strip())
-            lower = float(self._window.ui.txtVCalibLower.text().strip())
-        except ValueError:
-            return
-
-        if upper == lower:
-            return
-
-        if upper < lower:
-            return
-
-        self._calibration_thread = threading.Thread(
-                target=self.set_stepper_calibration,
-                args=('hstepper', upper, lower)
+                args=(settings['device'], upper, lower)
             )
         self._calibration_thread.start()
         self._window.tabCalib.setEnabled(False)
@@ -1018,11 +1011,6 @@ class DaqView:
 
             self._vreg_layouts.append(layout)
 
-    def set_vreg_calibration(self):
-        # Don't know what to do here yet.
-        self._dm.devices['vreg']['calibration'] = \
-            [(10.0, 1.5), (-10.0, -1.5)]
-
     #####################
     # Scan page functions
     #####################
@@ -1047,122 +1035,89 @@ class DaqView:
         self._window.ui.lblScanPoints.setText('Total points: --')
         self._window.ui.btnStartStopScan.setEnabled(False)
 
-        v_points = 0
-        h_points = 0
         self._dm.devices['vstepper']['scan'] = [None]
         self._dm.devices['hstepper']['scan'] = [None]
         self._dm.devices['vreg']['scan'] = [None, None]
 
-        verr = False
-        herr = False
+        vertical_settings = {
+            'txts': ['VMinPos', 'VMaxPos', 'VStepPos', 'VMinV', 'VMaxV', 'VStepV'],
+            'rb': self._window.ui.rbVScan,
+            'error': self._window.ui.lblVScanError,
+            'error_bool': False,
+            'calib_state': self._vercalib,
+            'device': 'vstepper',
+            'vreg_index': 0,
+            'points': 0
+        }
 
-        # calculate number of vectical points
-        if self._window.ui.rbVScan.isChecked() or self._window.ui.rbBothScan.isChecked():
-            # try to parse user input for all vertical textboxes
-            txtnames = ['VMinPos', 'VMaxPos', 'VStepPos', 'VMinV', 'VMaxV', 'VStepV']
-            ns = {} # local variables created with exec go in this "namespace".
-                    # Otherwise exec creates globals in python 3 which could be bad
-            try:
-                # uh oh, exec ahead!!! Panic!!!!
-                for txt in txtnames:
-                    exec('{} = float(self._window.ui.txt{}.text())'.format(
-                            txt.lower().split('pos')[0], txt), {'self':self}, ns)
-                    # this creates vmin, vmax, vstep, vminv, vmaxv, vstepv variables in the namespace
-            except ValueError:
-                # only show error message if user has entered everything, so check for blank text fields
-                # exec & eval in the same function??? Watch out!!!
-                txtlist = [eval('self._window.ui.txt{}.text()'.format(_), {'self':self}) for _ in txtnames]
-                if '' not in txtlist:
-                    self._window.ui.lblVScanError.setText('Bad input.')
-                    self._window.ui.lblVScanError.show()
-                verr = True
+        horizontal_settings = {
+            'txts': ['HMinPos', 'HMaxPos', 'HStepPos', 'HMinV', 'HMaxV', 'HStepV'],
+            'rb': self._window.ui.rbHScan,
+            'error': self._window.ui.lblHScanError,
+            'error_bool': False,
+            'calib_state': self._horcalib,
+            'device': 'hstepper',
+            'vreg_index': 1,
+            'points': 0
+        }
 
-            if not verr:
-                # user input should be sequential, and having a step of 0 will cause a divide by zero error
-                if (ns['vmin'] > ns['vmax']) or (ns['vminv'] > ns['vmaxv']) or \
-                        ns['vmin'] == ns['vmax'] or ns['vminv'] == ns['vmaxv'] or \
-                        ns['vstep'] == 0 or ns['vstepv'] == 0:
-                    self._window.ui.lblVScanError.setText('Bad values entered.')
-                    self._window.ui.lblVScanError.show()
-                    verr = True
+        for settings in [vertical_settings, horizontal_settings]:
+            if settings['rb'].isChecked() or self._window.ui.rbBothScan.isChecked():
+                # try to parse user input for all vertical textboxes
+                ns = {} # local variables created with exec go in this "namespace".
+                        # Otherwise exec creates globals in python 3 which could be bad
+                try:
+                    # uh oh, exec ahead!!! Panic!!!!
+                    for txt in settings['txts']:
+                        exec('{} = float(self._window.ui.txt{}.text())'.format(
+                                '_' + txt.lower().split('pos')[0][1:], txt), {'self':self}, ns)
+                        # this creates _min, _max, _step, _minv, _maxv, _stepv variables in the namespace
+                except ValueError:
+                    # only show error message if user has entered everything, so check for blank text fields
+                    # exec & eval in the same function??? Watch out!!!
+                    txtlist = [eval('self._window.ui.txt{}.text()'.format(_), {'self':self}) for _ in settings['txts']]
+                    if '' not in txtlist:
+                        settings['error'].setText('Bad input.')
+                        settings['error'].show()
+                    settings['error_bool'] = True
 
-                if self._vercalib:
-                    if ns['vmin'] < self._dm.devices['vstepper']['calibration'][1][1] or \
-                            ns['vmax'] > self._dm.devices['vstepper']['calibration'][0][1]:
+                if not settings['error_bool']:
+                    # user input should be sequential, and having a step of 0 will cause a divide by zero error
+                    if (ns['_min'] > ns['_max']) or (ns['_minv'] > ns['_maxv']) or \
+                            ns['_min'] == ns['_max'] or ns['_minv'] == ns['_maxv'] or \
+                            ns['_step'] == 0 or ns['_stepv'] == 0:
+                        settings['error'].setText('Bad values entered.')
+                        settings['error'].show()
+                        settings['error_bool'] = True
 
-                        self._window.ui.lblVScanError.setText('Values exceed device limits.')
-                        self._window.ui.lblVScanError.show()
-                        verr = True
+                    if settings['calib_state']:
+                        if ns['_min'] < self._dm.devices[settings['device']]['calibration'][1][1] or \
+                                ns['_max'] > self._dm.devices[settings['device']]['calibration'][0][1]:
 
-            if not verr:
-                self._window.ui.lblVScanError.hide()
+                            settings['error'].setText('Values exceed device limits.')
+                            settings['error'].show()
+                            settings['error_bool'] = True
 
-                # we create the list of vertical points, undoing the user-entered values
-                steprange = arange_inclusive(ns['vmin'], ns['vmax'], ns['vstep'])
-                volrange = arange_inclusive(ns['vminv'], ns['vmaxv'], ns['vstepv'])
-                self._dm.devices['vstepper']['scan'] = \
-                    [calibrate(steprange, self._dm.devices['vstepper'], reverse=True)]
-                # alt flag indicates to use the set voltage instead of the read voltage
-                self._dm.devices['vreg']['scan'][0] = \
-                    calibrate(volrange, self._dm.devices['vreg'], reverse=True, alt=True)
+                if not settings['error_bool']:
+                    settings['error'].hide()
 
-                v_points = len(self._dm.devices['vstepper']['scan'][0]) * \
-                            len(self._dm.devices['vreg']['scan'][0])
+                    # we create the list of vertical points, undoing the user-entered values
+                    steprange = arange_inclusive(ns['_min'], ns['_max'], ns['_step'])
+                    volrange = arange_inclusive(ns['_minv'], ns['_maxv'], ns['_stepv'])
+                    self._dm.devices[settings['device']]['scan'] = \
+                        [calibrate(steprange, self._dm.devices[settings['device']], reverse=True)]
+                    # alt flag indicates to use the set voltage instead of the read voltage
+                    self._dm.devices['vreg']['scan'][settings['vreg_index']] = \
+                        calibrate(volrange, self._dm.devices['vreg'], reverse=True, alt=True)
 
-        # calculate number of horizontal points. Same as above block.
-        # I don't like duplicating the code, but there doesn't seem to be a good
-        # way to make it generalizable since all the Qt control names are different
-        if self._window.ui.rbHScan.isChecked() or self._window.ui.rbBothScan.isChecked():
-            # try to parse user input for all vertical textboxes
-            txtnames = ['HMinPos', 'HMaxPos', 'HStepPos', 'HMinV', 'HMaxV', 'HStepV']
-            ns = {}  # local variables created with exec go here
-            try:
-                for txt in txtnames:
-                    exec('{} = float(self._window.ui.txt{}.text())'.format(
-                            txt.lower().split('pos')[0], txt), {'self':self}, ns)
-            except ValueError:
-                # only show error message if user has entered everything
-                txtlist = [eval('self._window.ui.txt{}.text()'.format(_), {'self':self}) for _ in txtnames]
-                if '' not in txtlist:
-                    self._window.ui.lblHScanError.setText('Bad input.')
-                    self._window.ui.lblHScanError.show()
-                herr = True
+                    settings['points'] = len(self._dm.devices[settings['device']]['scan'][0]) * \
+                        len(self._dm.devices['vreg']['scan'][settings['vreg_index']])
 
-            if not herr:
-                # user input should be sequential, and having a step of 0 will cause a divide by zero error
-                if (ns['hmin'] > ns['hmax']) or (ns['hminv'] > ns['hmaxv']) or \
-                        ns['hmin'] == ns['hmax'] or ns['hminv'] == ns['hmaxv'] or \
-                        ns['hstep'] == 0 or ns['hstepv'] == 0:
-                    self._window.ui.lblHScanError.setText('Bad values entered.')
-                    self._window.ui.lblHScanError.show()
-                    herr = True
-
-                if self._horcalib:
-                    if ns['hmin'] < self._dm.devices['hstepper']['calibration'][1][1] or \
-                            ns['hmax'] > self._dm.devices['hstepper']['calibration'][0][1]:
-
-                        self._window.ui.lblHScanError.setText('Values exceed device limits.')
-                        self._window.ui.lblHScanError.show()
-                        herr = True
-
-            if not herr:
-                self._window.ui.lblHScanError.hide()
-
-                # create list of horizontal points
-                steprange = arange_inclusive(ns['hmin'], ns['hmax'], ns['hstep'])
-                volrange = arange_inclusive(ns['hminv'], ns['hmaxv'], ns['hstepv'])
-                self._dm.devices['hstepper']['scan'] = \
-                    [calibrate(steprange, self._dm.devices['hstepper'], reverse=True)]
-                self._dm.devices['vreg']['scan'][1] = \
-                    calibrate(volrange, self._dm.devices['vreg'], reverse=True, alt=True)
-
-                h_points = len(self._dm.devices['hstepper']['scan'][0]) * \
-                            len(self._dm.devices['vreg']['scan'][1])
-
-        if not (verr or herr):
+        if not (vertical_settings['error_bool'] or horizontal_settings['error_bool']):
             # if we made it here, then we can update the # of points label
             self._window.ui.lblScanPoints.setText(
-                    'Total points: {}'.format(h_points + v_points))
+                    'Total points: {}'.format(
+                        vertical_settings['points'] + horizontal_settings['points']))
 
             # and if the user has selected a valid file, then they may start a scan
             if self._scanfile != '':
