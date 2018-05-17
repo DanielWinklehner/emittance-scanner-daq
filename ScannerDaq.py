@@ -104,11 +104,11 @@ class Daq(QObject):
     sig_scan_finished = pyqtSignal(bool) # emits true if done, or false if there is still a horizontal scan to do
     sig_done = pyqtSignal() # emit when all scans have completed
 
-    def __init__(self, devices):
+    def __init__(self, devices, com_wait=0.5):
         super().__init__()
 
-        # local copy of device dict
-        self._devices = devices
+        self._devices = devices  # local copy of device dict
+        self._com_wait = com_wait  # adjust wait time between sending set commands
 
         self._v_scan_pts = None
         self._h_scan_pts = None
@@ -127,7 +127,8 @@ class Daq(QObject):
                                     dtype=[('time', object),
                                            ('pos', object),
                                            ('v', object),
-                                           ('i', object)]
+                                           ('i', object),
+                                           ('i_rms', object)]
                                     )
 
             vsteps = len(self._v_scan_pts[1])
@@ -150,7 +151,8 @@ class Daq(QObject):
                                     dtype=[('time', object),
                                            ('pos', object),
                                            ('v', object),
-                                           ('i', object)]
+                                           ('i', object),
+                                           ('i_rms', object)]
                                     )
 
             hsteps = len(self._h_scan_pts[1])
@@ -187,7 +189,7 @@ class Daq(QObject):
 
                 msg = 'setall {} {} {}'.format(vtarget, htarget, voltarget)
                 self.sig_msg.emit(msg)
-            time.sleep(0.5)
+            time.sleep(self._com_wait)
 
         # now send some more commands if we are not at voltage target
         if voltarget is None:
@@ -207,7 +209,7 @@ class Daq(QObject):
             if self._devices['vreg']['value'] == prev_val:
                 msg = 'setall {} {} {}'.format(None, None, voltarget)
                 self.sig_msg.emit(msg)
-            time.sleep(0.5)
+            time.sleep(self._com_wait)
 
     def scan(self, stepper, stepper_pts, vreg_pts):
 
@@ -255,9 +257,11 @@ class Daq(QObject):
                     time.sleep(0.001)
 
                 current = np.mean(currents)
+                current_rms = np.std(currents)
                 idx = i * stepsv + j
                 data_frame = self._vdata if stepper == 'vstepper' else self._hdata
                 data_frame[idx]['i'] = current
+                data_frame[idx]['i_rms'] = current_rms
                 data_frame[idx]['time'] = t
                 pt = data_frame[idx][0]
                 self.sig_new_pt.emit(pt, kind)
@@ -300,15 +304,6 @@ class Daq(QObject):
     @property
     def hdata(self):
         return self._hdata
-
-    def save_data(self):
-        pass
-
-    def send_data(self):
-        pass
-
-    def stop(self):
-        pass
 
     def terminate(self):
         self._terminate = True
@@ -511,6 +506,7 @@ class DeviceManager(QObject):
 class DaqView:
     """ Handles interaction between GUI & server """
     def __init__(self):
+        self._connected_to_server = False
 
         self._window = MainWindow.MainWindow()
 
@@ -550,8 +546,10 @@ class DaqView:
         self._window.ui.btnVregTest.clicked.connect(self.test_vreg)
 
         # scan page textboxes all call the same checking function
-        txtlist = ['txtVMinPos', 'txtVMaxPos', 'txtVStepPos', 'txtVMinV', 'txtVMaxV', 'txtVStepV',
-                   'txtHMinPos', 'txtHMaxPos', 'txtHStepPos', 'txtHMinV', 'txtHMaxV', 'txtHStepV']
+        txtlist = [
+            'txtVMinPos', 'txtVMaxPos', 'txtVStepPos', 'txtVMinV', 'txtVMaxV', 'txtVStepV',
+            'txtHMinPos', 'txtHMaxPos', 'txtHStepPos', 'txtHMinV', 'txtHMaxV', 'txtHStepV'
+        ]
 
         for txt in txtlist:
             eval('self._window.ui.{}.textChanged.connect(self.on_scan_textbox_change)'.format(txt))
@@ -638,7 +636,9 @@ class DaqView:
                 self._comm.server_ip, self._comm.port))
 
         self._window.btnConnect.setText('Stop')
+        self._connected_to_server = True
         self._window.tabCalib.setEnabled(True)
+        self.check_calibration()  # case where user is reconnecting
 
     def shutdown_communication(self):
         try:
@@ -668,6 +668,7 @@ class DaqView:
         self._window.btnConnect.setText('Connect')
         self._window.tabCalib.setEnabled(False)
         self._window.tabScan.setEnabled(False)
+        self._connected_to_server = False
 
         # reset devices
         self._dm.devices['vstepper']['calibration'] = [(None, None), (None, None)]
@@ -744,7 +745,8 @@ class DaqView:
             self._dm.devices['hstepper']['type'] = int
             self._horcalib = False
 
-        if self._vregcalib and (self._vercalib or self._horcalib):
+        if self._connected_to_server and self._vregcalib and \
+                (self._vercalib or self._horcalib):
             self._window.tabScan.setEnabled(True)
 
             if not self._vercalib:
@@ -770,6 +772,8 @@ class DaqView:
             self._window.ui.rbHScanStatus.setEnabled(True)
             self._window.on_scan_rb_changed()
             self._window.ui.rbBothScan.setEnabled(True)
+        else:
+            self._window.tabScan.setEnabled(False)
 
     def save_session(self):
         """ Write window settings and device calibrations to a file """
@@ -917,7 +921,6 @@ class DaqView:
 
         self.check_calibration()
         self._window.tabCalib.setEnabled(True)
-        self._window.tabScan.setEnabled(True)
         self._window.ui.gbSteppers.setEnabled(True)
 
     def on_vreg_calibration_textbox_change(self):
@@ -1142,9 +1145,16 @@ class DaqView:
         # correctly without it
         self.on_scan_textbox_change()
 
+        # if the user has modified the COM delay setting
+        com_delay = 0.5
+        try:
+            com_delay = float(self._window.ui.txtScanComDelay.text().strip())
+        except:
+            pass
+
         # create a new thead & daq instance
         self._scan_thread = QThread()
-        self._daq = Daq(self._dm.devices)
+        self._daq = Daq(self._dm.devices, com_wait=com_delay)
 
         # connect Daq object signals
         self._daq.sig_msg.connect(self._comm.add_message_to_queue)
@@ -1204,7 +1214,7 @@ class DaqView:
                    "# {} scan\n" \
                    "# Time initiated: {}\n" \
                    "# Number of points: {}\n" \
-                   "time,pos,v,i\n".format(kind, time, str(pts))
+                   "time,pos,v,i,i_rms\n".format(kind, time, str(pts))
 
         _file = self._scanfile
         if self._window.ui.rbBothScan.isChecked():

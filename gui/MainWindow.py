@@ -65,7 +65,7 @@ class MainWindow(QMainWindow):
             'txtVCalibUpper', 'txtVCalibLower', 'txtHCalibUpper', 'txtHCalibLower',
             'txtVMinPos', 'txtVMaxPos', 'txtVStepPos', 'txtVMinV', 'txtVMaxV', 'txtVStepV',
             'txtHMinPos', 'txtHMaxPos', 'txtHStepPos', 'txtHMinV', 'txtHMaxV', 'txtHStepV',
-            'txtIP', 'txtPort'
+            'txtIP', 'txtPort', 'txtScanComDelay'
          ]
 
         for txt in textboxes:
@@ -88,7 +88,7 @@ class MainWindow(QMainWindow):
             'txtVCalibUpper', 'txtVCalibLower', 'txtHCalibUpper', 'txtHCalibLower',
             'txtVMinPos', 'txtVMaxPos', 'txtVStepPos', 'txtVMinV', 'txtVMaxV', 'txtVStepV',
             'txtHMinPos', 'txtHMaxPos', 'txtHStepPos', 'txtHMinV', 'txtHMaxV', 'txtHStepV',
-            'txtIP', 'txtPort'
+            'txtIP', 'txtPort', 'txtScanComDelay'
         ]
 
         for txt in textboxes:
@@ -112,6 +112,9 @@ class MainWindow(QMainWindow):
         self.ui.rbHScan.setEnabled(val)
         self.ui.rbBothScan.setEnabled(val)
         self.ui.gbFileOptions.setEnabled(val)
+        self.ui.txtScanComDelay.setEnabled(val)
+        self.ui.lblScanComDelay.setEnabled(val)
+        self.ui.lblScanComDelayUnit.setEnabled(val)
         if val:
             # if we are re-enabling everything, make sure the groupboxes match
             # the selected radiobutton
