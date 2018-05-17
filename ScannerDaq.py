@@ -12,6 +12,7 @@ import time
 import timeit
 import queue
 import threading
+import json
 from collections import deque
 
 import numpy as np
@@ -40,7 +41,7 @@ def arange_inclusive(start, stop, step, decimals=6):
 
 
 def close_enough(val1, val2, epsilon=1e-6):
-    """ Really dumb function for comparing floats """
+    """ Function for comparing floats """
     return abs(val1 - val2) < epsilon
 
 
@@ -72,10 +73,6 @@ def calibrate(val, device, reverse=False, alt=False):
     if alt:
         xs = [pt[2] for pt in pts]
 
-    # for only the voltage regulator, the read value is different than the set
-    # value in base units. The third index of each calibration point holds the set value
-    # for this device.
-
     if reverse:
         xs, ys = ys, xs
 
@@ -84,7 +81,7 @@ def calibrate(val, device, reverse=False, alt=False):
 
 
 def clear_layout(layout):
-    """ Remove all Qt widgets from a layout """
+    """ Recursively remove all Qt widgets from a layout """
     if layout is not None:
         while layout.count():
             item = layout.takeAt(0)
@@ -101,7 +98,6 @@ class CouldNotConnectError(Exception):
 
 class Daq(QObject):
     """ Class for collecting and organizing data from scans """
-
     sig_msg = pyqtSignal(str) # emit when ready to send command to server
     sig_new_pt = pyqtSignal(object, str) # emit when the scan completes a new point, string tells which type of scan
     sig_scan_started = pyqtSignal(str, str) # emits timestamps when scan starts
@@ -202,7 +198,7 @@ class Daq(QObject):
         calib_val = calibrate(
             calibrate(voltarget, self._devices['vreg'], alt=True),
             self._devices['vreg'], reverse=True)
-            
+
         while not close_enough(self._devices['vreg']['value'], calib_val, epsilon=0.01):
             # for exiting mid-scan
             if self._terminate:
@@ -520,6 +516,10 @@ class DaqView:
         self._window.btnConnect.clicked.connect(self.connect_to_server)
         self._window.ui.btnExit.triggered.connect(self.exit)
 
+        # load/save session
+        self._window.ui.btnSaveSession.triggered.connect(self.save_session)
+        self._window.ui.btnLoadSession.triggered.connect(self.load_session)
+
         # stepper manual controls & test buttons
         self._window.ui.btnRetract.clicked.connect(lambda: self.stepper_com('SL SP'))
         self._window.ui.btnExtend.clicked.connect(lambda: self.stepper_com('SL - SP'))
@@ -590,7 +590,6 @@ class DaqView:
         print('Setting voltage regulator to {0:.2f}'.format(val))
 
     def connect_to_server(self):
-
         if self._window.btnConnect.text() == 'Stop':
             self.shutdown_communication()
             return
@@ -763,6 +762,35 @@ class DaqView:
             self._window.ui.rbHScanStatus.setEnabled(True)
             self._window.on_scan_rb_changed()
             self._window.ui.rbBothScan.setEnabled(True)
+
+    def save_session(self):
+        calibration_dict = {
+            'vstepper': self._dm.devices['vstepper']['calibration'],
+            'hstepper': self._dm.devices['hstepper']['calibration'],
+            'vreg': self._dm.devices['vreg']['calibration'],
+        }
+
+        save_data = {
+            'ui': self._window.session_properties,
+            'devices': calibration_dict
+        }
+
+        with open('session.cfg', 'w') as f:
+            json.dump(save_data, f, sort_keys=True, indent=4, separators=(', ', ': '))
+
+    def load_session(self):
+        data_dict = {}
+        with open('session.cfg', 'r') as f:
+            data_dict = json.loads(f.read())
+
+        self._window.apply_session_properties(data_dict['ui'])
+        for device_name, calibration in data_dict['devices'].items():
+            # json doesn't have tuples??
+            _calibration = [tuple(pt) for pt in calibration]
+            self._dm.devices[device_name]['calibration'] = _calibration
+
+        # this function also calls self.check_calibration()
+        self.update_vreg_calibration()
 
     ############################
     # Calibration page functions
