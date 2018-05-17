@@ -633,6 +633,16 @@
                   </property>
                  </widget>
                 </item>
+                <item>
+                 <widget class="QLabel" name="lblVCalibError">
+                  <property name="text">
+                   <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;TextLabel&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                  </property>
+                  <property name="wordWrap">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
                </layout>
               </widget>
              </item>
@@ -701,6 +711,16 @@
                  <widget class="QPushButton" name="btnStartHCalib">
                   <property name="text">
                    <string>Start Calibration</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="lblHCalibError">
+                  <property name="text">
+                   <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;TextLabel&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                  </property>
+                  <property name="wordWrap">
+                   <bool>true</bool>
                   </property>
                  </widget>
                 </item>
@@ -801,6 +821,16 @@
               </widget>
              </item>
             </layout>
+           </item>
+           <item>
+            <widget class="QLabel" name="lblVolCalibError">
+             <property name="text">
+              <string>TextLabel</string>
+             </property>
+             <property name="wordWrap">
+              <bool>true</bool>
+             </property>
+            </widget>
            </item>
            <item>
             <layout class="QHBoxLayout" name="horizontalLayout_10">
@@ -1137,6 +1167,9 @@
                       <property name="text">
                        <string>TextLabel</string>
                       </property>
+                      <property name="wordWrap">
+                       <bool>true</bool>
+                      </property>
                      </widget>
                     </item>
                     <item>
@@ -1323,6 +1356,9 @@
                      <widget class="QLabel" name="lblHScanError">
                       <property name="text">
                        <string>TextLabel</string>
+                      </property>
+                      <property name="wordWrap">
+                       <bool>true</bool>
                       </property>
                      </widget>
                     </item>
@@ -1623,7 +1659,7 @@
                 </size>
                </property>
                <property name="title">
-                <string>Info</string>
+                <string>Scan Status</string>
                </property>
                <layout class="QVBoxLayout" name="verticalLayout_15">
                 <item>

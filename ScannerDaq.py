@@ -424,18 +424,19 @@ class DeviceManager(QObject):
         self._devices = dict()
 
         for name in device_name_list:
-            self._devices[name] = {'value': 0.0, # real value returned from the server
-                                   'type': float,
-                                   'deque': deque(maxlen=10),
-                                   'hasErr': False,
-                                   'label': None,
-                                   'name': '',
-                                   'unit': '',
-                                   'status': '',
-                                   'fmt': '{0:.2f}',
-                                   'calibration': [(None, None), (None, None)], # Linear interpolate between these points if set
-                                   'scan': None # holds list of sets of points to scan
-                                  }
+            self._devices[name] = {
+                'value': 0.0, # real value returned from the server
+                'type': float,
+                'deque': deque(maxlen=10),
+                'hasErr': False,
+                'label': None,
+                'name': '',
+                'unit': '',
+                'status': '',
+                'fmt': '{0:.2f}',
+                'calibration': [(None, None), (None, None)], # Linear interpolate between these points if set
+                'scan': None # holds list of sets of points to scan
+            }
 
         # stepper motors have special flags to indicate max/min positions
         self._devices['vstepper']['flag'] = ''
@@ -531,6 +532,14 @@ class DaqView:
         self._window.ui.btnSetVreg.clicked.connect(self.set_vreg)
         self._window.ui.btnAddVregPoint.clicked.connect(self.add_vreg_calibration_point)
 
+        # calibration page textboxes. Use eval to connect them all to the same function
+        txtlist = ['txtVCalibUpper', 'txtVCalibLower', 'txtHCalibUpper', 'txtHCalibLower']
+        for txt in txtlist:
+            eval('self._window.ui.{}.textChanged.connect(self.on_calibration_textbox_changed)'.format(txt))
+
+        self._window.ui.txtSetVreg.textChanged.connect(self.on_vreg_calibration_textbox_change)
+        self._window.ui.txtVregCalib.textChanged.connect(self.on_vreg_calibration_textbox_change)
+
         # scan buttons
         self._window.ui.btnChooseFile.clicked.connect(self.choose_file)
         self._window.ui.btnStartStopScan.clicked.connect(self.scan)
@@ -540,8 +549,7 @@ class DaqView:
         # testing buttons
         self._window.ui.btnVregTest.clicked.connect(self.test_vreg)
 
-        # scan page textboxes all call the same checking function, so we do this
-        # with eval instead of writing out 12 separate lines
+        # scan page textboxes all call the same checking function
         txtlist = ['txtVMinPos', 'txtVMaxPos', 'txtVStepPos', 'txtVMinV', 'txtVMaxV', 'txtVStepV',
                    'txtHMinPos', 'txtHMaxPos', 'txtHStepPos', 'txtHMinV', 'txtHMaxV', 'txtHStepV']
 
@@ -764,6 +772,7 @@ class DaqView:
             self._window.ui.rbBothScan.setEnabled(True)
 
     def save_session(self):
+        """ Write window settings and device calibrations to a file """
         calibration_dict = {
             'vstepper': self._dm.devices['vstepper']['calibration'],
             'hstepper': self._dm.devices['hstepper']['calibration'],
@@ -780,8 +789,12 @@ class DaqView:
 
     def load_session(self):
         data_dict = {}
-        with open('session.cfg', 'r') as f:
-            data_dict = json.loads(f.read())
+        try:
+            with open('session.cfg', 'r') as f:
+                data_dict = json.loads(f.read())
+        except IOError:
+            # file does not exist
+            return
 
         self._window.apply_session_properties(data_dict['ui'])
         for device_name, calibration in data_dict['devices'].items():
@@ -796,16 +809,56 @@ class DaqView:
     # Calibration page functions
     ############################
 
+    def on_calibration_textbox_changed(self):
+        vertical_controls = {
+            'upper': self._window.ui.txtVCalibUpper,
+            'lower': self._window.ui.txtVCalibLower,
+            'error': self._window.ui.lblVCalibError,
+        }
+
+        horizontal_controls = {
+            'upper': self._window.ui.txtHCalibUpper,
+            'lower': self._window.ui.txtHCalibLower,
+            'error': self._window.ui.lblHCalibError,
+        }
+
+        for controls in [vertical_controls, horizontal_controls]:
+            # only display error message if both textboxes are filled in
+            if '' in [controls['upper'].text().strip(), controls['lower'].text().strip()]:
+                return
+
+            try:
+                upper = float(controls['upper'].text().strip())
+                lower = float(controls['lower'].text().strip())
+            except ValueError:
+                controls['error'].setText("Bad values entered for limits.")
+                controls['error'].show()
+                return
+
+            if upper == lower:
+                controls['error'].setText("Limits must be different.")
+                controls['error'].show()
+                return
+
+            if upper < lower:
+                controls['error'].setText("Upper limit must be greater than lower limit.")
+                controls['error'].show()
+                return
+
+            # we pass all the checks, so hide the error label
+            controls['error'].hide()
+
     def start_vstepper_calibration(self):
         try:
             upper = float(self._window.ui.txtVCalibUpper.text().strip())
             lower = float(self._window.ui.txtVCalibLower.text().strip())
         except ValueError:
-            # TODO: Meaningful error message
             return
 
         if upper == lower:
-            # TODO: Meaningful error message
+            return
+
+        if upper < lower:
             return
 
         self._calibration_thread = threading.Thread(
@@ -819,14 +872,15 @@ class DaqView:
 
     def start_hstepper_calibration(self):
         try:
-            upper = float(self._window.ui.txtHCalibUpper.text().strip())
-            lower = float(self._window.ui.txtHCalibLower.text().strip())
+            upper = float(self._window.ui.txtVCalibUpper.text().strip())
+            lower = float(self._window.ui.txtVCalibLower.text().strip())
         except ValueError:
-            # TODO: Meaningful error message
             return
 
         if upper == lower:
-            # TODO: Meaningful error message
+            return
+
+        if upper < lower:
             return
 
         self._calibration_thread = threading.Thread(
@@ -873,12 +927,34 @@ class DaqView:
         self._window.tabScan.setEnabled(True)
         self._window.ui.gbSteppers.setEnabled(True)
 
+    def on_vreg_calibration_textbox_change(self):
+        # don't show error if user hasn't entered values
+        if '' in [self._window.ui.txtSetVreg.text().strip(), \
+                self._window.ui.txtVregCalib.text().strip()]:
+            self._window.ui.lblVolCalibError.hide()
+            return
+
+        try:
+            val = float(self._window.ui.txtSetVreg.text())
+        except ValueError:
+            self._window.ui.lblVolCalibError.setText("Bad input for SET value.")
+            self._window.ui.lblVolCalibError.show()
+            return
+
+        try:
+            val_in_kv = float(self._window.ui.txtVregCalib.text())
+        except ValueError:
+            self._window.ui.lblVolCalibError.setText("Bad input for kV value.")
+            self._window.ui.lblVolCalibError.show()
+            return
+
+        self._window.ui.lblVolCalibError.hide()
+
     def set_vreg(self):
         # read value from text box
         try:
             val = float(self._window.ui.txtSetVreg.text())
         except ValueError:
-            # TODO: Meaningful error message
             return
 
         # set the voltage regulator on the server
@@ -889,21 +965,22 @@ class DaqView:
         try:
             val = float(self._window.ui.txtSetVreg.text())
         except ValueError:
-            # TODO: Meaningful error message
             return
 
         # see what the user entered in the conversion text box
         try:
             val_in_kv = float(self._window.ui.txtVregCalib.text())
         except ValueError:
-            # TODO: Meaningful error messag
             return
 
         # make sure this calibration point is unique
         read_val = float('{0:.2f}'.format(self._dm.devices['vreg']['value']))
         if read_val in [pt[0] for pt in self._dm.devices['vreg']['calibration']]:
-            # TODO: Meaningful error message
+            self._window.ui.lblVolCalibError.setText("There is already a calibation point at the current value.")
+            self._window.ui.lblVolCalibError.show()
             return
+
+        self._window.ui.lblVolCalibError.hide()
 
         # otherwise add the point
         # format is: (what server reads, what user measures, what user sets)
@@ -926,7 +1003,8 @@ class DaqView:
         # add current set of calibration points
         for i, point in enumerate(self._dm.devices['vreg']['calibration']):
 
-            lbl = QLabel('{}. {} V (read) = {} kV = {} V (set)'.format(i + 1, point[0], point[1], point[2]))
+            lbl = QLabel('{}. {} V (read) = {} kV = {} V (set)'.format(
+                i + 1, point[0], point[1], point[2]))
             btn = QPushButton('Delete')
             layout = QHBoxLayout()
 
@@ -936,7 +1014,7 @@ class DaqView:
             layout.addStretch()
             layout.addWidget(btn)
 
-            self._window.ui.gbVolCalib.layout().insertLayout(5 + i, layout)
+            self._window.ui.gbVolCalib.layout().insertLayout(6 + i, layout)
 
             self._vreg_layouts.append(layout)
 

@@ -8,7 +8,6 @@ from .ui_MainWindow import Ui_MainWindow
 from matplotlib import cm
 import numpy as np
 
-import json
 
 class MainWindow(QMainWindow):
 
@@ -16,10 +15,6 @@ class MainWindow(QMainWindow):
         super(MainWindow, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
-
-        # load/save session
-        self.ui.btnSaveSession.triggered.connect(self.save_session)
-        self.ui.btnLoadSession.triggered.connect(self.load_session)
 
         # signal connections
         self.ui.rbVCalib.toggled.connect(self.on_calib_rb_changed)
@@ -31,6 +26,11 @@ class MainWindow(QMainWindow):
         # disable calibration page manually (I don't know why I can't do this in Creator)
         self.ui.tab.setEnabled(False)
         self.ui.gbHCalib.setEnabled(False)
+
+        # hide calibration page error labels
+        self.ui.lblVCalibError.hide()
+        self.ui.lblHCalibError.hide()
+        self.ui.lblVolCalibError.hide()
 
         # scan page
         self.ui.lblVScanError.hide()
@@ -62,10 +62,11 @@ class MainWindow(QMainWindow):
                                         settings['split-scaninfo-second']])
 
         textboxes = [
-                        'txtVCalibUpper', 'txtVCalibLower', 'txtHCalibUpper', 'txtHCalibLower',
-                        'txtVMinPos', 'txtVMaxPos', 'txtVStepPos', 'txtVMinV', 'txtVMaxV', 'txtVStepV',
-                        'txtHMinPos', 'txtHMaxPos', 'txtHStepPos', 'txtHMinV', 'txtHMaxV', 'txtHStepV'
-                     ]
+            'txtVCalibUpper', 'txtVCalibLower', 'txtHCalibUpper', 'txtHCalibLower',
+            'txtVMinPos', 'txtVMaxPos', 'txtVStepPos', 'txtVMinV', 'txtVMaxV', 'txtVStepV',
+            'txtHMinPos', 'txtHMaxPos', 'txtHStepPos', 'txtHMinV', 'txtHMaxV', 'txtHStepV',
+            'txtIP', 'txtPort'
+         ]
 
         for txt in textboxes:
             eval('self.ui.{}.setText("{}")'.format(txt, settings[txt]))
@@ -73,38 +74,27 @@ class MainWindow(QMainWindow):
     @property
     def session_properties(self):
         settings = {
-                    'split-scan-first': self.ui.splitScan.sizes()[0],
-                    'split-scan-second': self.ui.splitScan.sizes()[1],
-                    'split-scaninfo-first': self.ui.splitScanInfo.sizes()[0],
-                    'split-scaninfo-second': self.ui.splitScanInfo.sizes()[1],
-                    'window-pos-x': self.pos().x(),
-                    'window-pos-y': self.pos().y(),
-                    'window-width': self.frameSize().width(),
-                    'window-height': self.frameSize().height(),
-                   }
+            'split-scan-first': self.ui.splitScan.sizes()[0],
+            'split-scan-second': self.ui.splitScan.sizes()[1],
+            'split-scaninfo-first': self.ui.splitScanInfo.sizes()[0],
+            'split-scaninfo-second': self.ui.splitScanInfo.sizes()[1],
+            'window-pos-x': self.pos().x(),
+            'window-pos-y': self.pos().y(),
+            'window-width': self.frameSize().width(),
+            'window-height': self.frameSize().height(),
+        }
 
         textboxes = [
-                        'txtVCalibUpper', 'txtVCalibLower', 'txtHCalibUpper', 'txtHCalibLower',
-                        'txtVMinPos', 'txtVMaxPos', 'txtVStepPos', 'txtVMinV', 'txtVMaxV', 'txtVStepV',
-                        'txtHMinPos', 'txtHMaxPos', 'txtHStepPos', 'txtHMinV', 'txtHMaxV', 'txtHStepV'
-                     ]
+            'txtVCalibUpper', 'txtVCalibLower', 'txtHCalibUpper', 'txtHCalibLower',
+            'txtVMinPos', 'txtVMaxPos', 'txtVStepPos', 'txtVMinV', 'txtVMaxV', 'txtVStepV',
+            'txtHMinPos', 'txtHMaxPos', 'txtHStepPos', 'txtHMinV', 'txtHMaxV', 'txtHStepV',
+            'txtIP', 'txtPort'
+        ]
 
         for txt in textboxes:
             settings[txt] = eval('self.ui.{}.text()'.format(txt))
 
         return settings
-
-    def load_session(self):
-        with open('session.cfg', 'r') as f:
-            #try:
-            self.apply_session_properties(json.loads(f.read()))
-            #except:
-                # could not read JSON
-            #    pass
-
-    def save_session(self):
-        with open('session.cfg', 'w') as f:
-            json.dump(self.session_properties, f, sort_keys=True, indent=4, separators=(', ', ': '))
 
     def on_calib_rb_changed(self):
         if self.ui.rbVCalib.isChecked():
@@ -115,7 +105,7 @@ class MainWindow(QMainWindow):
             self.ui.gbHCalib.setEnabled(True)
 
     def enable_scan_controls(self, val):
-        ''' Enumerates controls that should be disabled when scan starts '''
+        """ Enumerates controls that should be disabled when scan starts """
         self.ui.gbVScan.setEnabled(val)
         self.ui.gbHScan.setEnabled(val)
         self.ui.rbVScan.setEnabled(val)

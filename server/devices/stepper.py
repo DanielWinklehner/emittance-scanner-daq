@@ -19,20 +19,20 @@ class Stepper():
 
         # startup commands
         self._init_prgm = [
-                'FD',           # reset to default settings
-                'MS=16',        # 16 microsteps/step
-                'A=50000',      # steps/sec^2
-                'VA SP=12800',  # create and set speed variable in steps/sec
-                'VM=12800',     # maximum velocity in steps/sec
-                'RC=85',        # set run current as percent (e.g. 75=75%)
-                'S1=3,1',       # enable limit - switch & use with HM command
-                'S2=2,1'        # enable limit + switch & use with HM command
-            ]
+            'FD',           # reset to default settings
+            'MS=16',        # 16 microsteps/step
+            'A=50000',      # steps/sec^2
+            'VA SP=12800',  # create and set speed variable in steps/sec
+            'VM=12800',     # maximum velocity in steps/sec
+            'RC=85',        # set run current as percent (e.g. 75=75%)
+            'S1=3,1',       # enable limit - switch & use with HM command
+            'S2=2,1'        # enable limit + switch & use with HM command
+        ]
 
         # loop commands - get current position
         self._run_prgm = [
-                'PR C1 " " ER', 'r'
-            ]
+            'PR C1 " " ER', 'r'
+        ]
 
         # server will put commands to be issued in this queue object
         self._command_queue = Queue.Queue()
