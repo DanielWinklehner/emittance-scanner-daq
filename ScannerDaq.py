@@ -640,6 +640,8 @@ class DaqView:
         self._window.ui.btnExtend.clicked.connect(lambda: self.stepper_com('SL - SP'))
         self._window.ui.btnStop.clicked.connect(lambda: self.stepper_com('\x1b')) # esc key
         self._window.ui.btnSetVregLimits.clicked.connect(self.set_vreg_limits)
+        self._window.ui.txtVregMin.textChanged.connect(self.on_vreg_limit_text_changed)
+        self._window.ui.txtVregMax.textChanged.connect(self.on_vreg_limit_text_changed)
 
         # calibration buttons
         self._window.ui.btnStartVCalib.clicked.connect(lambda: self.start_stepper_calibration('vstepper'))
@@ -714,6 +716,10 @@ class DaqView:
         self._comm.add_message_to_queue('vset vset {0:.2f}'.format(val))
         print('Setting voltage regulator to {0:.2f}'.format(val))
 
+    def on_vreg_limit_text_changed(self):
+        self._window.ui.txtVregMin.setStyleSheet('')
+        self._window.ui.txtVregMax.setStyleSheet('')
+
     def set_vreg_limits(self):
         try:
             _min = float(self._window.ui.txtVregMin.text().strip())
@@ -727,11 +733,14 @@ class DaqView:
             self._window.ui.txtVregMax.setStyleSheet('background-color: #FFBBBB')
             return
 
-        self._window.ui.txtVregMin.setStyleSheet('')
-        self._window.ui.txtVregMax.setStyleSheet('')
+        self._window.ui.txtVregMin.setStyleSheet('background-color: #BBFFBB')
+        self._window.ui.txtVregMax.setStyleSheet('background-color: #BBFFBB')
 
         self._dm.devices['vreg']['min'] = _min
         self._dm.devices['vreg']['max'] = _max
+
+        # if user has set scan values already, update them with the new limits
+        self.on_scan_textbox_change()
 
     def connect_to_server(self):
         if self._window.btnConnect.text() == 'Stop':
@@ -951,6 +960,7 @@ class DaqView:
 
         # this function also calls self.check_calibration()
         self.update_vreg_calibration()
+        self.on_scan_textbox_change()
 
     ############################
     # Calibration page functions

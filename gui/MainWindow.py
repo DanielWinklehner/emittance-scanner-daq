@@ -113,9 +113,9 @@ class MainWindow(QMainWindow):
         self.ui.rbHScan.setEnabled(val)
         self.ui.rbBothScan.setEnabled(val)
         self.ui.gbFileOptions.setEnabled(val)
-        self.ui.txtScanComDelay.setEnabled(val)
-        self.ui.lblScanComDelay.setEnabled(val)
-        self.ui.lblScanComDelayUnit.setEnabled(val)
+        #self.ui.txtScanComDelay.setEnabled(val)
+        #self.ui.lblScanComDelay.setEnabled(val)
+        #self.ui.lblScanComDelayUnit.setEnabled(val)
         self.ui.hrScan.setEnabled(val)
 
         if val:
