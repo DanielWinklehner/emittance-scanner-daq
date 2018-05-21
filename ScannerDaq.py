@@ -167,13 +167,14 @@ class Daq(QObject):
         self._terminate = False
 
         # keep track of current point and number of total points to give status updates
+        self._current_scan_direction = 'Vertical'
         self._total_points = 0
         if self._vdata is not None:
             self._total_points += len(self._vdata)
         if self._hdata is not None:
             self._total_points += len(self._hdata)
 
-        self._point_times = deque(maxlen=self._total_points)  # fast appends
+        self._point_times = []
         self._prev_point_time = None
         self._current_point_count = 0
 
@@ -294,6 +295,7 @@ class Daq(QObject):
     def run(self):
         # do vertical scan
         if self._v_scan_pts is not None:
+            self._current_scan_direction = 'Vertical'
             self.scan('vstepper', self._v_scan_pts[0], self._v_scan_pts[1])
 
         # do horizontal scan
@@ -304,6 +306,8 @@ class Daq(QObject):
                 # don't emit unless we have already done the vertical scan
                 self.sig_scan_finished.emit(False)
 
+            self._current_scan_direction = 'Horizontal'
+            self._prev_point_time = None
             self.scan('hstepper', self._h_scan_pts[0], self._h_scan_pts[1])
 
         self._terminate = True
@@ -319,15 +323,81 @@ class Daq(QObject):
         """ Estimate time left in scan by average time between points and
             number of points remainig (in seconds).
         """
-        return (self._total_points - self._current_point_count) * np.mean(self._point_times)
+        long_cutoff = self._com_wait * 1.5  # seconds (might need to be tuned,
+                                            # and actually depends on how fast
+                                            # the stepper moves, but this is
+                                            # a much simpler calculation)
+
+
+        v_scan_offset = 0  # index offset for self._point_times if 'both' scan
+        if self._v_scan_pts is not None:
+            v_scan_offset = len(self._vdata)
+
+        scan_pts = None
+        if self._current_scan_direction == 'Vertical':
+            # estimate for vertical scan
+            scan_pts = self._v_scan_pts
+            slice_min = None
+            slice_max = v_scan_offset
+            pts_remaining = v_scan_offset - self._current_point_count
+        else:
+            scan_pts = self._h_scan_pts
+            slice_min = v_scan_offset
+            slice_max = None
+            pts_remaining = self._total_points - self._current_point_count
+
+        # only select points that are associated with the current scan
+        numpy_point_times = np.asarray(self._point_times[slice_min:slice_max])
+
+        # estimate the number of remaining long points (i.e. when stepper has to move)
+        # this is just number of stepper points, -1 due to starting
+        long_rate_estimate = (len(scan_pts[0]) - 1) / self.current_scan_total_points()
+        fast_rate_estimate = 1. - long_rate_estimate
+
+        # average time of long delay
+        long_average = np.mean(numpy_point_times[np.where(numpy_point_times > long_cutoff)])
+        if np.isnan(long_average):
+            long_average = long_cutoff * 2.  # conservative
+
+        # average time of fast delay
+        fast_average = np.mean(numpy_point_times[np.where(numpy_point_times < long_cutoff)])
+        if np.isnan(fast_average):
+            fast_average = long_cutoff
+
+        # time remaining prediction is weighted average of fast & long points
+        weighted_average = long_rate_estimate * long_average + \
+            fast_rate_estimate * fast_average
+
+        # number of vertical points left times weighted average estimator
+        return pts_remaining * weighted_average
 
     @property
     def current_point_count(self):
         return self._current_point_count
 
+    def current_scan_point_count(self):
+        v_offset = 0
+        if self._v_scan_pts is not None:
+            v_offset += len(self._vdata)
+
+        if self._current_scan_direction == 'Vertical':
+            return self._current_point_count
+        else:
+            return self._current_point_count - v_offset
+
+    @property
+    def current_scan_direction(self):
+        return self._current_scan_direction
+
     @property
     def total_points(self):
         return self._total_points
+
+    def current_scan_total_points(self):
+        if self._current_scan_direction == 'Vertical':
+            return len(self._vdata)
+        else:
+            return len(self._hdata)
 
     @property
     def vdata(self):
@@ -1287,7 +1357,7 @@ class DaqView:
 
         # status updates
         time_remaining = self._daq.time_remaining()
-        if not np.isnan(time_remaining) and self._daq.current_point_count > 5:
+        if not np.isnan(time_remaining) and self._daq.current_scan_point_count() > 5:
             m, s = divmod(time_remaining, 60)
             if m > 0:
                 self._window.ui.lblScanTime.setText('Est. time remaining: {:d} minute{} and {:d} seconds'.format(
