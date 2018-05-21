@@ -357,7 +357,8 @@ class Daq(QObject):
         # average time of long delay
         long_average = np.mean(numpy_point_times[np.where(numpy_point_times > long_cutoff)])
         if np.isnan(long_average):
-            long_average = long_cutoff * 2.  # conservative
+            # we have no long times so we might as well guess
+            long_average = long_cutoff * 2.  # a better estimate would use stepper speed
 
         # average time of fast delay
         fast_average = np.mean(numpy_point_times[np.where(numpy_point_times < long_cutoff)])
@@ -571,6 +572,10 @@ class DeviceManager(QObject):
         self._devices['vreg']['status'] = 'Not calibrated'
         self._devices['vreg']['calibration'] = []
 
+        # default HV configuration
+        self._devices['vreg']['min'] = -1.5
+        self._devices['vreg']['max'] = 1.5
+
     def on_data(self, data):
         data = data.decode("utf-8").split(' ')
         cur = float(data[0]) if data[0] != 'ERR' else 'ERR'
@@ -634,6 +639,7 @@ class DaqView:
         self._window.ui.btnRetract.clicked.connect(lambda: self.stepper_com('SL SP'))
         self._window.ui.btnExtend.clicked.connect(lambda: self.stepper_com('SL - SP'))
         self._window.ui.btnStop.clicked.connect(lambda: self.stepper_com('\x1b')) # esc key
+        self._window.ui.btnSetVregLimits.clicked.connect(self.set_vreg_limits)
 
         # calibration buttons
         self._window.ui.btnStartVCalib.clicked.connect(lambda: self.start_stepper_calibration('vstepper'))
@@ -707,6 +713,25 @@ class DaqView:
         val = np.random.uniform(-1, 1, 1)[0]
         self._comm.add_message_to_queue('vset vset {0:.2f}'.format(val))
         print('Setting voltage regulator to {0:.2f}'.format(val))
+
+    def set_vreg_limits(self):
+        try:
+            _min = float(self._window.ui.txtVregMin.text().strip())
+        except ValueError:
+            self._window.ui.txtVregMin.setStyleSheet('background-color: #FFBBBB')
+            return
+
+        try:
+            _max = float(self._window.ui.txtVregMax.text().strip())
+        except ValueError:
+            self._window.ui.txtVregMax.setStyleSheet('background-color: #FFBBBB')
+            return
+
+        self._window.ui.txtVregMin.setStyleSheet('')
+        self._window.ui.txtVregMax.setStyleSheet('')
+
+        self._dm.devices['vreg']['min'] = _min
+        self._dm.devices['vreg']['max'] = _max
 
     def connect_to_server(self):
         if self._window.btnConnect.text() == 'Stop':
@@ -898,7 +923,9 @@ class DaqView:
 
         save_data = {
             'ui': self._window.session_properties,
-            'devices': calibration_dict
+            'devices': calibration_dict,
+            'vreg': {'min': self._dm.devices['vreg']['min'],
+                     'max': self._dm.devices['vreg']['max']}
         }
 
         with open('session.cfg', 'w') as f:
@@ -918,6 +945,9 @@ class DaqView:
             # json doesn't have tuples??
             _calibration = [tuple(pt) for pt in calibration]
             self._dm.devices[device_name]['calibration'] = _calibration
+
+        self._dm.devices['vreg']['min'] = data_dict['vreg']['min']
+        self._dm.devices['vreg']['max'] = data_dict['vreg']['max']
 
         # this function also calls self.check_calibration()
         self.update_vreg_calibration()
@@ -1207,8 +1237,13 @@ class DaqView:
                         settings['error_bool'] = True
 
                     if settings['calib_state']:
+                        # stepper motors are limited by their endpoint calibration
+                        # vreg can have non-endpoint callibration points
+                        # but has a physical limit
                         if ns['_min'] < self._dm.devices[settings['device']]['calibration'][1][1] or \
-                                ns['_max'] > self._dm.devices[settings['device']]['calibration'][0][1]:
+                                ns['_max'] > self._dm.devices[settings['device']]['calibration'][0][1] or \
+                                ns['_minv'] < self._dm.devices['vreg']['min'] or \
+                                ns['_maxv'] > self._dm.devices['vreg']['max']:
 
                             settings['error'].setText('Values exceed device limits.')
                             settings['error'].show()

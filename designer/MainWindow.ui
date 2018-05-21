@@ -123,7 +123,7 @@
        <attribute name="title">
         <string>Communication</string>
        </attribute>
-       <layout class="QVBoxLayout" name="verticalLayout_18">
+       <layout class="QVBoxLayout" name="verticalLayout_20">
         <item>
          <widget class="QGroupBox" name="groupBox_11">
           <property name="title">
@@ -259,204 +259,352 @@
          </widget>
         </item>
         <item>
-         <layout class="QHBoxLayout" name="horizontalLayout_17">
+         <layout class="QHBoxLayout" name="horizontalLayout_21">
           <item>
-           <widget class="QGroupBox" name="groupBox_3">
-            <property name="title">
-             <string>Picoammeter</string>
+           <widget class="QCheckBox" name="chkDanger">
+            <property name="text">
+             <string>I know what I'm doing</string>
             </property>
-            <layout class="QVBoxLayout" name="verticalLayout_12">
-             <item>
-              <widget class="QLabel" name="lblVerPos_2">
-               <property name="text">
-                <string>Device Found</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="Line" name="line_7">
-               <property name="orientation">
-                <enum>Qt::Horizontal</enum>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QLabel" name="label_57">
-               <property name="text">
-                <string>Sample rate</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <layout class="QHBoxLayout" name="horizontalLayout_13">
-               <item>
-                <widget class="QRadioButton" name="radioButton_3">
-                 <property name="text">
-                  <string>Fast</string>
-                 </property>
-                 <property name="checked">
-                  <bool>true</bool>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QRadioButton" name="radioButton_2">
-                 <property name="text">
-                  <string>Medium</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QRadioButton" name="radioButton">
-                 <property name="text">
-                  <string>Slow</string>
-                 </property>
-                </widget>
-               </item>
-              </layout>
-             </item>
-             <item>
-              <widget class="QLabel" name="label_42">
-               <property name="text">
-                <string>Averaging</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <layout class="QHBoxLayout" name="horizontalLayout_14">
-               <item>
-                <widget class="QLineEdit" name="lineEdit">
-                 <property name="sizePolicy">
-                  <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-                   <horstretch>0</horstretch>
-                   <verstretch>0</verstretch>
-                  </sizepolicy>
-                 </property>
-                 <property name="text">
-                  <string>1</string>
-                 </property>
-                 <property name="alignment">
-                  <set>Qt::AlignCenter</set>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QLabel" name="label_56">
-                 <property name="text">
-                  <string>Samples</string>
-                 </property>
-                </widget>
-               </item>
-              </layout>
-             </item>
-            </layout>
            </widget>
           </item>
           <item>
-           <widget class="QGroupBox" name="groupBox_10">
-            <property name="title">
-             <string>Voltage Regulator</string>
+           <spacer name="horizontalSpacer_16">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
             </property>
-            <layout class="QGridLayout" name="gridLayout_12">
-             <item row="0" column="0">
-              <widget class="QLabel" name="lblVerPos_4">
-               <property name="text">
-                <string>Device Found</string>
-               </property>
-              </widget>
-             </item>
-             <item row="1" column="0">
-              <widget class="QPushButton" name="btnVregTest">
-               <property name="text">
-                <string>Send test signal</string>
-               </property>
-              </widget>
-             </item>
-             <item row="2" column="0">
-              <widget class="QLabel" name="lblVerPos_8">
-               <property name="text">
-                <string>Response: Ok!</string>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </widget>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
           </item>
          </layout>
         </item>
         <item>
-         <widget class="QGroupBox" name="gbSteppers">
-          <property name="title">
-           <string>Stepper Motors</string>
+         <widget class="QGroupBox" name="gbDanger">
+          <property name="enabled">
+           <bool>false</bool>
           </property>
-          <layout class="QHBoxLayout" name="horizontalLayout_18">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">#gbDanger::title {color: red}</string>
+          </property>
+          <property name="title">
+           <string>Danger Zone</string>
+          </property>
+          <layout class="QVBoxLayout" name="verticalLayout_18">
            <item>
-            <spacer name="horizontalSpacer_8">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
-             </property>
-             <property name="sizeHint" stdset="0">
-              <size>
-               <width>236</width>
-               <height>20</height>
-              </size>
-             </property>
-            </spacer>
-           </item>
-           <item>
-            <layout class="QGridLayout" name="gridLayout_6">
-             <item row="0" column="0">
-              <widget class="QRadioButton" name="rbVMove">
-               <property name="text">
-                <string>Vertical</string>
+            <layout class="QHBoxLayout" name="horizontalLayout_17">
+             <item>
+              <widget class="QGroupBox" name="groupBox_3">
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                 <horstretch>0</horstretch>
+                 <verstretch>0</verstretch>
+                </sizepolicy>
                </property>
-               <property name="checked">
-                <bool>true</bool>
+               <property name="title">
+                <string>Picoammeter</string>
                </property>
+               <layout class="QVBoxLayout" name="verticalLayout_12">
+                <item>
+                 <widget class="QLabel" name="lblVerPos_2">
+                  <property name="text">
+                   <string>Device Found</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="Line" name="line_7">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="label_57">
+                  <property name="text">
+                   <string>Sample rate</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <layout class="QHBoxLayout" name="horizontalLayout_13">
+                  <item>
+                   <widget class="QRadioButton" name="radioButton_3">
+                    <property name="text">
+                     <string>Fast</string>
+                    </property>
+                    <property name="checked">
+                     <bool>true</bool>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QRadioButton" name="radioButton_2">
+                    <property name="text">
+                     <string>Medium</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QRadioButton" name="radioButton">
+                    <property name="text">
+                     <string>Slow</string>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </item>
+                <item>
+                 <widget class="QLabel" name="label_42">
+                  <property name="text">
+                   <string>Averaging</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <layout class="QHBoxLayout" name="horizontalLayout_14">
+                  <item>
+                   <widget class="QLineEdit" name="lineEdit">
+                    <property name="sizePolicy">
+                     <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                      <horstretch>0</horstretch>
+                      <verstretch>0</verstretch>
+                     </sizepolicy>
+                    </property>
+                    <property name="text">
+                     <string>1</string>
+                    </property>
+                    <property name="alignment">
+                     <set>Qt::AlignCenter</set>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLabel" name="label_56">
+                    <property name="text">
+                     <string>Samples</string>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </item>
+               </layout>
               </widget>
              </item>
-             <item row="1" column="0">
-              <widget class="QPushButton" name="btnRetract">
-               <property name="text">
-                <string>Retract</string>
+             <item>
+              <widget class="QGroupBox" name="groupBox_10">
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                 <horstretch>0</horstretch>
+                 <verstretch>0</verstretch>
+                </sizepolicy>
                </property>
-              </widget>
-             </item>
-             <item row="0" column="1">
-              <widget class="QRadioButton" name="rbHMove">
-               <property name="text">
-                <string>Horizontal</string>
+               <property name="title">
+                <string>Voltage Regulator</string>
                </property>
-              </widget>
-             </item>
-             <item row="2" column="0" colspan="2">
-              <widget class="QPushButton" name="btnStop">
-               <property name="text">
-                <string>Stop</string>
-               </property>
-              </widget>
-             </item>
-             <item row="1" column="1">
-              <widget class="QPushButton" name="btnExtend">
-               <property name="text">
-                <string>Extend</string>
-               </property>
+               <layout class="QVBoxLayout" name="verticalLayout_21">
+                <item>
+                 <widget class="QPushButton" name="btnVregTest">
+                  <property name="text">
+                   <string>Send random value [-1, 1]</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="Line" name="line_5">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <layout class="QGridLayout" name="gridLayout_8">
+                  <item row="0" column="0">
+                   <widget class="QLabel" name="label_21">
+                    <property name="text">
+                     <string>Min HV output</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="0" column="1">
+                   <widget class="QLineEdit" name="txtVregMin">
+                    <property name="styleSheet">
+                     <string notr="true"/>
+                    </property>
+                    <property name="text">
+                     <string>-1.5</string>
+                    </property>
+                    <property name="alignment">
+                     <set>Qt::AlignCenter</set>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="0" column="2">
+                   <widget class="QLabel" name="label_23">
+                    <property name="text">
+                     <string>kV</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="1" column="0">
+                   <widget class="QLabel" name="label_22">
+                    <property name="text">
+                     <string>Max HV output</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="1" column="1">
+                   <widget class="QLineEdit" name="txtVregMax">
+                    <property name="text">
+                     <string>1.5</string>
+                    </property>
+                    <property name="alignment">
+                     <set>Qt::AlignCenter</set>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="1" column="2">
+                   <widget class="QLabel" name="label_24">
+                    <property name="text">
+                     <string>kV</string>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </item>
+                <item>
+                 <layout class="QHBoxLayout" name="horizontalLayout_22">
+                  <item>
+                   <spacer name="horizontalSpacer_15">
+                    <property name="orientation">
+                     <enum>Qt::Horizontal</enum>
+                    </property>
+                    <property name="sizeType">
+                     <enum>QSizePolicy::Expanding</enum>
+                    </property>
+                    <property name="sizeHint" stdset="0">
+                     <size>
+                      <width>40</width>
+                      <height>20</height>
+                     </size>
+                    </property>
+                   </spacer>
+                  </item>
+                  <item>
+                   <widget class="QPushButton" name="btnSetVregLimits">
+                    <property name="text">
+                     <string>Set</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <spacer name="horizontalSpacer_17">
+                    <property name="orientation">
+                     <enum>Qt::Horizontal</enum>
+                    </property>
+                    <property name="sizeType">
+                     <enum>QSizePolicy::Expanding</enum>
+                    </property>
+                    <property name="sizeHint" stdset="0">
+                     <size>
+                      <width>40</width>
+                      <height>20</height>
+                     </size>
+                    </property>
+                   </spacer>
+                  </item>
+                 </layout>
+                </item>
+               </layout>
               </widget>
              </item>
             </layout>
            </item>
            <item>
-            <spacer name="horizontalSpacer_13">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
+            <widget class="QGroupBox" name="gbSteppers">
+             <property name="title">
+              <string>Stepper Motors</string>
              </property>
-             <property name="sizeHint" stdset="0">
-              <size>
-               <width>236</width>
-               <height>20</height>
-              </size>
-             </property>
-            </spacer>
+             <layout class="QHBoxLayout" name="horizontalLayout_18">
+              <item>
+               <spacer name="horizontalSpacer_8">
+                <property name="orientation">
+                 <enum>Qt::Horizontal</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>236</width>
+                  <height>20</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+              <item>
+               <layout class="QGridLayout" name="gridLayout_6">
+                <item row="0" column="0">
+                 <widget class="QRadioButton" name="rbVMove">
+                  <property name="text">
+                   <string>Vertical</string>
+                  </property>
+                  <property name="checked">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="0">
+                 <widget class="QPushButton" name="btnRetract">
+                  <property name="text">
+                   <string>Retract</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="0" column="1">
+                 <widget class="QRadioButton" name="rbHMove">
+                  <property name="text">
+                   <string>Horizontal</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="2" column="0" colspan="2">
+                 <widget class="QPushButton" name="btnStop">
+                  <property name="text">
+                   <string>Stop</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="1">
+                 <widget class="QPushButton" name="btnExtend">
+                  <property name="text">
+                   <string>Extend</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <spacer name="horizontalSpacer_13">
+                <property name="orientation">
+                 <enum>Qt::Horizontal</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>236</width>
+                  <height>20</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+             </layout>
+            </widget>
            </item>
           </layout>
          </widget>
@@ -1751,32 +1899,6 @@
                  </widget>
                 </item>
                 <item>
-                 <widget class="QLabel" name="label_23">
-                  <property name="font">
-                   <font>
-                    <family>MS Sans Serif</family>
-                    <italic>true</italic>
-                   </font>
-                  </property>
-                  <property name="text">
-                   <string>Vertical, +5cm</string>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <widget class="QLabel" name="label_38">
-                  <property name="font">
-                   <font>
-                    <family>MS Sans Serif</family>
-                    <italic>true</italic>
-                   </font>
-                  </property>
-                  <property name="text">
-                   <string>Voltage: 2 kV</string>
-                  </property>
-                 </widget>
-                </item>
-                <item>
                  <widget class="QLabel" name="lblScanTime">
                   <property name="font">
                    <font>
@@ -1788,6 +1910,19 @@
                    <string>Est. Time Remaining: 5 minutes</string>
                   </property>
                  </widget>
+                </item>
+                <item>
+                 <spacer name="verticalSpacer_6">
+                  <property name="orientation">
+                   <enum>Qt::Vertical</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>40</height>
+                   </size>
+                  </property>
+                 </spacer>
                 </item>
                </layout>
               </widget>

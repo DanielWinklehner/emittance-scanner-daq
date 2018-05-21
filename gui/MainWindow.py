@@ -17,6 +17,7 @@ class MainWindow(QMainWindow):
         self.ui.setupUi(self)
 
         # signal connections
+        self.ui.chkDanger.toggled.connect(lambda chk: self.ui.gbDanger.setEnabled(chk))
         self.ui.rbVCalib.toggled.connect(self.on_calib_rb_changed)
         self.ui.rbVScan.toggled.connect(self.on_scan_rb_changed)
         self.ui.rbBothScan.toggled.connect(self.on_scan_rb_changed)
@@ -65,7 +66,7 @@ class MainWindow(QMainWindow):
             'txtVCalibUpper', 'txtVCalibLower', 'txtHCalibUpper', 'txtHCalibLower',
             'txtVMinPos', 'txtVMaxPos', 'txtVStepPos', 'txtVMinV', 'txtVMaxV', 'txtVStepV',
             'txtHMinPos', 'txtHMaxPos', 'txtHStepPos', 'txtHMinV', 'txtHMaxV', 'txtHStepV',
-            'txtIP', 'txtPort', 'txtScanComDelay'
+            'txtIP', 'txtPort', 'txtScanComDelay', 'txtVregMin', 'txtVregMax'
          ]
 
         for txt in textboxes:
@@ -88,7 +89,7 @@ class MainWindow(QMainWindow):
             'txtVCalibUpper', 'txtVCalibLower', 'txtHCalibUpper', 'txtHCalibLower',
             'txtVMinPos', 'txtVMaxPos', 'txtVStepPos', 'txtVMinV', 'txtVMaxV', 'txtVStepV',
             'txtHMinPos', 'txtHMaxPos', 'txtHStepPos', 'txtHMinV', 'txtHMaxV', 'txtHStepV',
-            'txtIP', 'txtPort', 'txtScanComDelay'
+            'txtIP', 'txtPort', 'txtScanComDelay', 'txtVregMin', 'txtVregMax'
         ]
 
         for txt in textboxes:
@@ -116,7 +117,7 @@ class MainWindow(QMainWindow):
         self.ui.lblScanComDelay.setEnabled(val)
         self.ui.lblScanComDelayUnit.setEnabled(val)
         self.ui.hrScan.setEnabled(val)
-        
+
         if val:
             # if we are re-enabling everything, make sure the groupboxes match
             # the selected radiobutton
