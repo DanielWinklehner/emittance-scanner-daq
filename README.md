@@ -11,7 +11,7 @@ Server and GUI for operating the MIST-1 emittance scanners
 
  - Bugs
     - Slow communication can cause messages to pile up (e.g. 'vset 10000poll') which will stop communication. Seems to only happen very rarely
-    - Voltage regulator calibration not implemented (multi-point calibration preferred)
+    - (Done) ~~Voltage regulator calibration not implemented (multi-point calibration preferred)~~
     - 1px offset in bottom row of scan histograms... No discernable negative effects other than it is annoying
 
 
@@ -24,6 +24,6 @@ Server and GUI for operating the MIST-1 emittance scanners
        1. ~~Window: size, position, splitter dimensions~~
        2. ~~Devices: calibration distances~~
        3. ~~Scans: All fields could be saved~~
-    - Fill in missing error message blocks
+    - (Done) ~~Fill in missing error message blocks~~
     - Fill in scan status labels & estimate time remaining
     - Automatically repeat calibration at user-specified intervals

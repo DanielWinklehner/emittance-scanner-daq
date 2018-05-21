@@ -67,6 +67,15 @@ class Mover():
     def terminate(self):
         self._terminate = True
 
+def clear_queues(self):
+    qs = [vstepper_queue, hstepper_queue]
+    for q in qs:
+        """ Thread-safe removal of all pending commands in queue """
+        with q.mutex:
+            q.queue.clear()
+            q.all_tasks_done.notify_all()
+            q.unfinished_tasks = 0
+
 def run_vstepper():
     vmover = Mover('vstepper', 6400)
     move_thread = threading.Thread(target=vmover.run)
@@ -127,7 +136,7 @@ def poll():
     # what I would like to do:
     # device_names = [device_name for device_name, _ in devices.iteritems()]
     # maybe this can be solved with an ordered dict
-    devices['pico'] = np.random.normal(1, 1)
+    devices['pico'] = np.random.normal(1, 1) * 1.0e-11
     values = [devices[device_name] for device_name in device_names]
 
     for i in [1,2]:
@@ -196,6 +205,8 @@ try:
             if tp == ['poll']:
                 # on poll request we immediately send the result
                 conn.send(fmap[tp[0]]())
+            elif tp == ['stop']:
+                clear_queues()
             elif tp[0] != 'setall':
                 # single arg commands
                 word, arg = tp

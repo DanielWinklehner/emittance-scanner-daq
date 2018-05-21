@@ -1068,7 +1068,7 @@
                 </layout>
                </item>
                <item>
-                <widget class="Line" name="line_5">
+                <widget class="Line" name="hrScan">
                  <property name="orientation">
                   <enum>Qt::Horizontal</enum>
                  </property>

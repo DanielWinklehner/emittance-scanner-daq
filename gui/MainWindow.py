@@ -115,6 +115,8 @@ class MainWindow(QMainWindow):
         self.ui.txtScanComDelay.setEnabled(val)
         self.ui.lblScanComDelay.setEnabled(val)
         self.ui.lblScanComDelayUnit.setEnabled(val)
+        self.ui.hrScan.setEnabled(val)
+        
         if val:
             # if we are re-enabling everything, make sure the groupboxes match
             # the selected radiobutton

@@ -349,7 +349,8 @@ class Comm(QObject):
 
     def poll(self):
         # send poll command or read from server if there is data
-        recv = True # true if OK to send new info to server, false if waiting
+        recv = True  # true if OK to send new info to server, false if waiting
+        set_last = False  # flag to indicate if the last command was a set command instead of a poll
         pollcount = 0
         sleep_time = 1. / self._polling_rate
         while not self._terminate:
@@ -360,14 +361,16 @@ class Comm(QObject):
                     start_time = timeit.default_timer()
 
                 # send any messages in the queue to the server
-                if not self._command_queue.empty():
+                if not self._command_queue.empty() and not set_last:
                     try:
                         cmd = self._command_queue.get_nowait()
                     except socket.timeout:
                         print('timeout')
+                        continue
                     self._socket.send(cmd.encode())
                     time.sleep(0.05)
                     recv = True
+                    set_last = True
                     continue
 
                 # otherwise just send a poll request
@@ -376,6 +379,7 @@ class Comm(QObject):
                         self._socket.send(b'poll')
                     except socket.timeout:
                         print('timeout')
+                    set_last = False
 
             ready = select.select([self._socket], [], [], 0)[0]
             if ready:
@@ -405,6 +409,13 @@ class Comm(QObject):
     @pyqtSlot(str)
     def add_message_to_queue(self, cmd):
         self._command_queue.put(cmd)
+
+    def clear_queue(self):
+        """ Thread-safe removal of all pending commands in queue """
+        with self._command_queue.mutex:
+            self._command_queue.queue.clear()
+            self._command_queue.all_tasks_done.notify_all()
+            self._command_queue.unfinished_tasks = 0
 
     def terminate(self):
         self._terminate = True
@@ -1134,6 +1145,7 @@ class DaqView:
 
         if self._window.ui.btnStartStopScan.text() == 'Stop Scan':
             self._window.ui.btnStartStopScan.setText('Start Scan')
+            self._comm.clear_queue()
             self._daq.terminate()
             self.stepper_com('\x1b')
             return
