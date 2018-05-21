@@ -166,6 +166,17 @@ class Daq(QObject):
 
         self._terminate = False
 
+        # keep track of current point and number of total points to give status updates
+        self._total_points = 0
+        if self._vdata is not None:
+            self._total_points += len(self._vdata)
+        if self._hdata is not None:
+            self._total_points += len(self._hdata)
+
+        self._point_times = deque(maxlen=self._total_points)  # fast appends
+        self._prev_point_time = None
+        self._current_point_count = 0
+
     def safe_move(self, vtarget, htarget, voltarget):
         """ Sends set command and waits until devices have reached set point """
 
@@ -250,7 +261,7 @@ class Daq(QObject):
                     break
 
                 # once we are at the target values, we find average current
-                t = dt.datetime.strftime(dt.datetime.now(), '%Y-%m-%d %H:%M:%S.%f')
+                t = dt.datetime.now()
                 currents = []
                 for k in range(50):
                     currents.append(self._devices['pico']['value'])
@@ -262,9 +273,16 @@ class Daq(QObject):
                 data_frame = self._vdata if stepper == 'vstepper' else self._hdata
                 data_frame[idx]['i'] = current
                 data_frame[idx]['i_rms'] = current_rms
-                data_frame[idx]['time'] = t
+                data_frame[idx]['time'] = dt.datetime.strftime(t, '%Y-%m-%d %H:%M:%S.%f')
                 pt = data_frame[idx][0]
                 self.sig_new_pt.emit(pt, kind)
+
+                # status update
+                self._current_point_count += 1
+                if self._prev_point_time is not None:
+                    time_delta = (t - self._prev_point_time).total_seconds()
+                    self._point_times.append(time_delta)
+                self._prev_point_time = t
 
         if not self._terminate:
             # move stepper to parked position -- calibration point 1 is tuple with (steps, mm), use steps
@@ -296,6 +314,20 @@ class Daq(QObject):
 
         # might need this line to tell Qt that this function is finished
         return
+
+    def time_remaining(self):
+        """ Estimate time left in scan by average time between points and
+            number of points remainig (in seconds).
+        """
+        return (self._total_points - self._current_point_count) * np.mean(self._point_times)
+
+    @property
+    def current_point_count(self):
+        return self._current_point_count
+
+    @property
+    def total_points(self):
+        return self._total_points
 
     @property
     def vdata(self):
@@ -1252,6 +1284,23 @@ class DaqView:
         with open(_file, 'a') as f:
             f.write(','.join([str(_) for _ in pt]))
             f.write('\n')
+
+        # status updates
+        time_remaining = self._daq.time_remaining()
+        if not np.isnan(time_remaining) and self._daq.current_point_count > 5:
+            m, s = divmod(time_remaining, 60)
+            if m > 0:
+                self._window.ui.lblScanTime.setText('Est. time remaining: {:d} minute{} and {:d} seconds'.format(
+                    int(m), 's' if int(m) > 1 else '', int(s)))
+            else:
+                self._window.ui.lblScanTime.setText('Est. time remaining: {:d} second{}'.format(
+                    int(s), 's' if int(s) != 1 else ''))
+        else:
+            self._window.ui.lblScanTime.setText('Est. time remaining: --')
+
+        self._window.ui.lblScanProgress.setText('Current point: {}/{} ({:.0%})'.format(
+            self._daq.current_point_count, self._daq.total_points,
+            self._daq.current_point_count / self._daq._total_points))
 
     def on_one_scan_finished(self, final):
         """ Function called after first scan (vertical) is finished.
