@@ -96,6 +96,49 @@ class CouldNotConnectError(Exception):
     pass
 
 
+class Calibrator(QObject):
+    """ Wrapper class for stepper calibration functions """
+    sig_msg = pyqtSignal(str) # emit when ready to send command to server
+    sig_done = pyqtSignal(str)
+
+    def __init__(self, stepper, lower, upper, devices):
+        super().__init__()
+        self._stepper = stepper
+        self._devices = devices
+
+        # upper_steps, upper, lower_steps, lower
+        self._calibration_data = [None, upper, None, lower]
+
+    @property
+    def calibration_data(self):
+        return self._calibration_data
+
+    def calibrate(self):
+        # send command to extend stepper
+        # wait until stepper isnt moving anymore
+        # set first point
+        # send command to retract stepper
+        # set second point
+
+        waittime = 0.1 # TODO maybe this should depend on the polling rate?
+        prefix = 'vmove ' if self._stepper == 'vstepper' else 'hmove '
+
+        # extend stepper <=> move in negative direction
+        msg = prefix + 'SL - SP'
+        self.sig_msg.emit(msg)
+        while self._devices[self._stepper]['flag'] != 'MIN':
+            time.sleep(waittime)
+        self._calibration_data[2] = self._devices[self._stepper]['value']
+
+        # retract stepper <=> move in positive direction
+        msg = prefix + 'SL SP'
+        self.sig_msg.emit(msg)
+        while self._devices[self._stepper]['flag'] != 'MAX':
+            time.sleep(waittime)
+        self._calibration_data[0] = self._devices[self._stepper]['value']
+
+        self.sig_done.emit(self._stepper)
+
 class Daq(QObject):
     """ Class for collecting and organizing data from scans """
     sig_msg = pyqtSignal(str) # emit when ready to send command to server
@@ -536,7 +579,7 @@ class DeviceManager(QObject):
             self._devices[name] = {
                 'value': 0.0, # real value returned from the server
                 'type': float,
-                'deque': deque(maxlen=10),
+                'deque': deque(maxlen=500),
                 'hasErr': False,
                 'label': None,
                 'name': '',
@@ -613,7 +656,7 @@ class DeviceManager(QObject):
             else:
                 info['hasErr'] = False
                 info['deque'].append(
-                        info['value']
+                        (time.time(), calibrate(info['value'], info))
                     )
 
     @property
@@ -710,7 +753,8 @@ class DaqView:
         # default objects for saving scans
         self._scanfile = ''
 
-        self.update_display_values()
+        self._update_timer = QTimer()
+        self._update_timer.timeout.connect(self.update_display_values)
 
     def test_vreg(self):
         val = np.random.uniform(-1, 1)
@@ -772,11 +816,12 @@ class DaqView:
 
         self._comm.sig_poll_rate.connect(self.on_poll_rate)
         self._comm.sig_data.connect(self._dm.on_data)
-        self._comm.sig_data.connect(self.update_display_values)
+        #self._comm.sig_data.connect(self.update_display_values)
         self._comm.sig_done.connect(self.shutdown_communication)
         self._comm.moveToThread(self._com_thread)
         self._com_thread.started.connect(self._comm.poll)
         self._com_thread.start()
+        self._update_timer.start(50)
         self._window.lblServerMsg.hide()
 
         self._window.statusBar.showMessage(
@@ -820,6 +865,7 @@ class DaqView:
         self._window.tabCalib.setEnabled(False)
         self._window.tabScan.setEnabled(False)
         self._connected_to_server = False
+        self._update_timer.stop()
 
         self._window.ui.lblServerStatus.setStyleSheet('color: red')
         self._window.ui.lblServerStatus.setText('Not connected')
@@ -849,6 +895,9 @@ class DaqView:
                             info['status'] != '' else ''
                     )
                 )
+                self._window.update_plot(device_name, info['deque'])
+
+        app.processEvents()
 
     # stepper buttons on home page call this function with fixed commands
     def stepper_com(self, cmd):
@@ -866,9 +915,11 @@ class DaqView:
             self._dm.devices['vreg']['status'] = ''
             self._dm.devices['vreg']['unit'] = 'kV'
             self._vregcalib = True
+            self._window._vreg_settings['unit'] = 'kV'
         else:
             self._dm.devices['vreg']['status'] = 'Not calibrated'
             self._dm.devices['vreg']['unit'] = 'V'
+            self._window._vreg_settings['unit'] = 'V'
             self._vregcalib = False
 
         # are both vertical points set?
@@ -877,12 +928,14 @@ class DaqView:
             self._dm.devices['vstepper']['unit'] = 'mm'
             self._dm.devices['vstepper']['fmt'] = '{0:.2f}'
             self._dm.devices['vstepper']['type'] = float
+            self._window._vstepper_settings['unit'] = 'mm'
             self._vercalib = True
         else:
             self._dm.devices['vstepper']['status'] = 'Not calibrated'
             self._dm.devices['vstepper']['unit'] = 'steps'
             self._dm.devices['vstepper']['fmt'] = '{:d}'
             self._dm.devices['vstepper']['type'] = int
+            self._window._vstepper_settings['unit'] = 'Steps'
             self._vercalib = False
 
         # same for horizontal points
@@ -891,13 +944,17 @@ class DaqView:
             self._dm.devices['hstepper']['unit'] = 'mm'
             self._dm.devices['hstepper']['fmt'] = '{0:.2f}'
             self._dm.devices['hstepper']['type'] = float
+            self._window._hstepper_settings['unit'] = 'mm'
             self._horcalib = True
         else:
             self._dm.devices['hstepper']['status'] = 'Not calibrated'
             self._dm.devices['hstepper']['unit'] = 'steps'
             self._dm.devices['hstepper']['fmt'] = '{:d}'
             self._dm.devices['hstepper']['type'] = int
+            self._window._hstepper_settings['unit'] = 'Steps'
             self._horcalib = False
+
+        self._window.update_plot_settings()
 
         if self._connected_to_server and self._vregcalib and \
                 (self._vercalib or self._horcalib):
@@ -1040,16 +1097,22 @@ class DaqView:
         if upper < lower:
             return
 
-        self._calibration_thread = threading.Thread(
-                target=self.set_stepper_calibration,
-                args=(settings['device'], upper, lower)
-            )
+        self._calibrator = Calibrator(settings['device'], lower, upper, self._dm.devices)
+        self._calibrator.sig_msg.connect(self._comm.add_message_to_queue)
+        self._calibrator.sig_done.connect(self.on_calibration_done)
+
+        self._calibration_thread = QThread()
+        self._calibrator.moveToThread(self._calibration_thread)
+        self._calibration_thread.started.connect(self._calibrator.calibrate)
+        self._calibration_thread.finished.connect(self.on_calibration_finished)
         self._calibration_thread.start()
+
         self._window.tabCalib.setEnabled(False)
         self._window.tabScan.setEnabled(False)
         self._window.ui.gbVCalib.setEnabled(False)
         self._window.ui.gbHCalib.setEnabled(False)
 
+    """
     def set_stepper_calibration(self, stepper, upper, lower):
         # send command to extend stepper
         # wait until stepper isnt moving anymore
@@ -1079,7 +1142,34 @@ class DaqView:
 
         self._dm.devices[stepper]['calibration'] = \
             [(upper_steps, upper), (lower_steps, lower)]
+    """
 
+    def on_calibration_done(self, stepper):
+        """ Clean up everything associated with calibration thread
+            and set the new calibration in the device manager.
+        """
+        upper_steps, upper, lower_steps, lower = self._calibrator.calibration_data
+        self._calibrator.deleteLater()
+        self._calibration_thread.quit()
+        self._calibration_thread.wait()
+
+        self._dm.devices[stepper]['calibration'] = \
+            [(upper_steps, upper), (lower_steps, lower)]
+
+        _range = upper - lower
+        if stepper == 'vstepper':
+            self._window._vstepper_settings['y']['min'] = lower - 0.1 * _range
+            self._window._vstepper_settings['y']['max'] = upper + 0.1 * _range
+            self._window._vstepper_settings['y']['mode'] = 'manual'
+        else:
+            self._window._hstepper_settings['y']['min'] = lower - 0.1 * _range
+            self._window._hstepper_settings['y']['max'] = upper + 0.1 * _range
+            self._window._hstepper_settings['y']['mode'] = 'manual'
+
+        self._window.update_plot_settings()
+
+    def on_calibration_finished(self):
+        """ This function is called once the thread has been safely deleted """
         self.check_calibration()
         self._window.tabCalib.setEnabled(True)
 
@@ -1456,7 +1546,7 @@ class DaqView:
         self._window.tabCalib.setEnabled(True)
         self._window.on_calib_rb_changed()
         self._window.enable_scan_controls(True)
-        
+
         # call this to make sure the proper controls stay disabled
         self.check_calibration()
 

@@ -1,12 +1,14 @@
-from PyQt5.QtWidgets import QMainWindow, QLabel, QFrame, QSizePolicy
+from PyQt5.QtWidgets import QMainWindow, QLabel, QFrame, QSizePolicy, QGridLayout
 from PyQt5.QtGui import QPixmap, QPainter, QBrush, QColor, QLinearGradient, \
                         QPalette
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
 
 from .ui_MainWindow import Ui_MainWindow
+from .widgets.DateTimePlotWidget import DateTimePlotWidget
 
 from matplotlib import cm
 import numpy as np
+import pyqtgraph as pg
 
 
 class MainWindow(QMainWindow):
@@ -15,6 +17,10 @@ class MainWindow(QMainWindow):
         super(MainWindow, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
+
+        # pyqtgraph configuration
+        pg.setConfigOption('background', 'w')
+        pg.setConfigOption('foreground', 0.1)
 
         # signal connections
         self.ui.chkDanger.toggled.connect(lambda chk: self.ui.gbDanger.setEnabled(chk))
@@ -47,6 +53,67 @@ class MainWindow(QMainWindow):
         # local copy of data arrays to plot
         self._hdata = None
         self._vdata = None
+
+        # monitoring plots
+        self._vstepper_plot = DateTimePlotWidget()
+        self._hstepper_plot = DateTimePlotWidget()
+        self._vreg_plot = DateTimePlotWidget()
+        self._pico_plot = DateTimePlotWidget()
+
+        self._vstepper_settings = {
+            'title': 'Vertical Stepper',
+            'name': 'Position',
+            'unit': 'Steps',
+            'x': {'mode': 'auto', 'grid': True, 'log': False},
+            'y': {'mode': 'auto', 'grid': True, 'log': False},
+            'widget': {'color': '#0000FF'}
+        }
+
+        self._hstepper_settings = {
+            'title': 'Horizontal Stepper',
+            'name': 'Position',
+            'unit': 'Steps',
+            'x': {'mode': 'auto', 'grid': True, 'log': False},
+            'y': {'mode': 'auto', 'grid': True, 'log': False},
+            'widget': {'color': '#FF0000'}
+        }
+
+        self._vreg_settings = {
+            'title': 'Voltage Regulator',
+            'name': 'Voltage',
+            'unit': 'V',
+            'x': {'mode': 'auto', 'grid': True, 'log': False},
+            'y': {'mode': 'auto', 'grid': True, 'log': False},
+            'widget': {'color': '#11BB44'}
+        }
+
+        self._pico_settings = {
+            'title': 'Picoammeter',
+            'name': 'Current',
+            'unit': 'A',
+            'x': {'mode': 'auto', 'grid': True, 'log': False},
+            'y': {'mode': 'auto', 'grid': True, 'log': False},
+            'widget': {'color': '#AA3300'}
+        }
+
+        self._vstepper_plot.settings = self._vstepper_settings
+        self._hstepper_plot.settings = self._hstepper_settings
+        self._vreg_plot.settings = self._vreg_settings
+        self._pico_plot.settings = self._pico_settings
+
+        self._vstepper_plot.setMinimumSize(350, 300)
+        self._hstepper_plot.setMinimumSize(350, 300)
+        self._vreg_plot.setMinimumSize(350, 300)
+        self._pico_plot.setMinimumSize(350, 300)
+
+        self._plot_layout = QGridLayout()
+        self._plot_layout.setContentsMargins(0, 0, 0, 0)
+        self.ui.fmMonitor.setLayout(self._plot_layout)
+
+        self._plot_layout.addWidget(self._vstepper_plot, 0, 0)
+        self._plot_layout.addWidget(self._hstepper_plot, 0, 1)
+        self._plot_layout.addWidget(self._vreg_plot, 1, 0)
+        self._plot_layout.addWidget(self._pico_plot, 1, 1)
 
     ########################
     # Session saving/loading
@@ -97,6 +164,28 @@ class MainWindow(QMainWindow):
 
         return settings
 
+    ##########
+    # Plotting
+    ##########
+
+    def update_plot_settings(self):
+        self._vreg_plot.settings = self._vreg_settings
+        self._vstepper_plot.settings = self._vstepper_settings
+        self._hstepper_plot.settings = self._hstepper_settings
+        self._pico_plot.settings = self._pico_settings
+
+    def update_plot(self, device_name, device_data):
+        # unzip list of tuples
+        x, y = [pt[0] for pt in device_data], [pt[1] for pt in device_data]
+        if device_name == 'vstepper':
+            self._vstepper_plot.curve.setData(x, y)
+        if device_name == 'hstepper':
+            self._hstepper_plot.curve.setData(x, y)
+        if device_name == 'vreg':
+            self._vreg_plot.curve.setData(x, y)
+        if device_name == 'pico':
+            self._pico_plot.curve.setData(x, y)
+
     def on_calib_rb_changed(self):
         if self.ui.rbVCalib.isChecked():
             self.ui.gbVCalib.setEnabled(True)
@@ -113,7 +202,7 @@ class MainWindow(QMainWindow):
         self.ui.rbHScan.setEnabled(val)
         self.ui.rbBothScan.setEnabled(val)
         self.ui.gbFileOptions.setEnabled(val)
-        
+
         if val:
             # if we are re-enabling everything, make sure the groupboxes match
             # the selected radiobutton
