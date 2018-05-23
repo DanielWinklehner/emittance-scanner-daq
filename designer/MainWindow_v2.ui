@@ -10,11 +10,22 @@
     <x>0</x>
     <y>0</y>
     <width>1154</width>
-    <height>762</height>
+    <height>728</height>
    </rect>
+  </property>
+  <property name="font">
+   <font>
+    <pointsize>9</pointsize>
+   </font>
+  </property>
+  <property name="contextMenuPolicy">
+   <enum>Qt::DefaultContextMenu</enum>
   </property>
   <property name="windowTitle">
    <string>MainWindow</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">font-size: 9pt</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QHBoxLayout" name="horizontalLayout_5">
@@ -27,6 +38,11 @@
           <width>300</width>
           <height>300</height>
          </size>
+        </property>
+        <property name="font">
+         <font>
+          <pointsize>9</pointsize>
+         </font>
         </property>
         <property name="frameShape">
          <enum>QFrame::Box</enum>
@@ -67,6 +83,11 @@
         </item>
         <item>
          <widget class="Line" name="line_15">
+          <property name="font">
+           <font>
+            <pointsize>9</pointsize>
+           </font>
+          </property>
           <property name="orientation">
            <enum>Qt::Horizontal</enum>
           </property>
@@ -150,6 +171,11 @@
         </item>
         <item>
          <widget class="Line" name="line_17">
+          <property name="font">
+           <font>
+            <pointsize>9</pointsize>
+           </font>
+          </property>
           <property name="orientation">
            <enum>Qt::Horizontal</enum>
           </property>
@@ -192,6 +218,11 @@
       </item>
       <item>
        <spacer name="verticalSpacer">
+        <property name="font">
+         <font>
+          <pointsize>9</pointsize>
+         </font>
+        </property>
         <property name="orientation">
          <enum>Qt::Vertical</enum>
         </property>
@@ -211,6 +242,9 @@
        <font>
         <pointsize>9</pointsize>
        </font>
+      </property>
+      <property name="styleSheet">
+       <string notr="true"/>
       </property>
       <property name="tabPosition">
        <enum>QTabWidget::North</enum>
@@ -234,7 +268,14 @@
            </font>
           </property>
           <property name="styleSheet">
-           <string notr="true">color:#003399</string>
+           <string notr="true">::enabled {
+color:#003399;
+font-size:12pt;
+}
+::!enabled {
+color: #6699EE;
+font-size:12pt;
+}</string>
           </property>
           <property name="frameShape">
            <enum>QFrame::NoFrame</enum>
@@ -246,6 +287,11 @@
         </item>
         <item>
          <widget class="QLabel" name="label_54">
+          <property name="font">
+           <font>
+            <pointsize>9</pointsize>
+           </font>
+          </property>
           <property name="text">
            <string>Enter the IP and port for the server.</string>
           </property>
@@ -270,7 +316,12 @@
              </font>
             </property>
             <property name="styleSheet">
-             <string notr="true">color:#003399</string>
+             <string notr="true">::enabled {
+color:#003399
+}
+::!enabled {
+color: #6699EE;
+}</string>
             </property>
             <property name="text">
              <string>Server</string>
@@ -293,6 +344,11 @@
           </property>
           <item row="0" column="0">
            <widget class="QLabel" name="label_39">
+            <property name="font">
+             <font>
+              <pointsize>9</pointsize>
+             </font>
+            </property>
             <property name="text">
              <string>IP:</string>
             </property>
@@ -305,6 +361,11 @@
               <horstretch>0</horstretch>
               <verstretch>0</verstretch>
              </sizepolicy>
+            </property>
+            <property name="font">
+             <font>
+              <pointsize>9</pointsize>
+             </font>
             </property>
             <property name="inputMask">
              <string/>
@@ -325,6 +386,11 @@
               <verstretch>0</verstretch>
              </sizepolicy>
             </property>
+            <property name="font">
+             <font>
+              <pointsize>9</pointsize>
+             </font>
+            </property>
             <property name="text">
              <string>5000</string>
             </property>
@@ -335,6 +401,11 @@
           </item>
           <item row="1" column="0">
            <widget class="QLabel" name="label_40">
+            <property name="font">
+             <font>
+              <pointsize>9</pointsize>
+             </font>
+            </property>
             <property name="text">
              <string>Port:</string>
             </property>
@@ -342,6 +413,11 @@
           </item>
           <item row="1" column="3">
            <widget class="QPushButton" name="btnConnect">
+            <property name="font">
+             <font>
+              <pointsize>9</pointsize>
+             </font>
+            </property>
             <property name="text">
              <string>Connect</string>
             </property>
@@ -367,6 +443,11 @@
         </item>
         <item>
          <widget class="QLabel" name="lblServerMsg">
+          <property name="font">
+           <font>
+            <pointsize>9</pointsize>
+           </font>
+          </property>
           <property name="text">
            <string>TextLabel</string>
           </property>
@@ -391,7 +472,12 @@
              </font>
             </property>
             <property name="styleSheet">
-             <string notr="true">color:#003399</string>
+             <string notr="true">::enabled {
+color:#003399
+}
+::!enabled {
+color: #6699EE;
+}</string>
             </property>
             <property name="text">
              <string>Danger Zone</string>
@@ -408,11 +494,36 @@
          </layout>
         </item>
         <item>
-         <widget class="QCheckBox" name="chkDanger">
-          <property name="text">
-           <string>I know what I'm doing</string>
+         <layout class="QHBoxLayout" name="horizontalLayout_3">
+          <property name="leftMargin">
+           <number>11</number>
           </property>
-         </widget>
+          <item>
+           <widget class="QCheckBox" name="chkDanger">
+            <property name="font">
+             <font>
+              <pointsize>9</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string>I know what I'm doing</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="horizontalSpacer_4">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+         </layout>
         </item>
         <item>
          <widget class="QFrame" name="gbDanger">
@@ -482,6 +593,11 @@ color: #6699EE;
              </property>
              <item>
               <widget class="QLabel" name="lblScanComDelay">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>COM Delay:</string>
                </property>
@@ -495,6 +611,11 @@ color: #6699EE;
                  <verstretch>0</verstretch>
                 </sizepolicy>
                </property>
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>0.5</string>
                </property>
@@ -505,6 +626,11 @@ color: #6699EE;
              </item>
              <item>
               <widget class="QLabel" name="lblScanComDelayUnit">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>seconds</string>
                </property>
@@ -572,6 +698,11 @@ color: #6699EE;
              </property>
              <item>
               <widget class="QPushButton" name="btnVregTest">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>Send random value [-1, 1]</string>
                </property>
@@ -599,6 +730,11 @@ color: #6699EE;
              </property>
              <item row="0" column="2">
               <widget class="QLabel" name="label_23">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>kV</string>
                </property>
@@ -606,6 +742,11 @@ color: #6699EE;
              </item>
              <item row="0" column="0">
               <widget class="QLabel" name="label_21">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>Min HV output</string>
                </property>
@@ -613,6 +754,11 @@ color: #6699EE;
              </item>
              <item row="1" column="0">
               <widget class="QLabel" name="label_22">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>Max HV output</string>
                </property>
@@ -625,6 +771,11 @@ color: #6699EE;
                  <horstretch>0</horstretch>
                  <verstretch>0</verstretch>
                 </sizepolicy>
+               </property>
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
                </property>
                <property name="styleSheet">
                 <string notr="true"/>
@@ -645,6 +796,11 @@ color: #6699EE;
                  <verstretch>0</verstretch>
                 </sizepolicy>
                </property>
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>1.5</string>
                </property>
@@ -655,6 +811,11 @@ color: #6699EE;
              </item>
              <item row="1" column="2">
               <widget class="QLabel" name="label_24">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>kV</string>
                </property>
@@ -667,6 +828,11 @@ color: #6699EE;
                  <horstretch>0</horstretch>
                  <verstretch>0</verstretch>
                 </sizepolicy>
+               </property>
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
                </property>
                <property name="text">
                 <string>Set</string>
@@ -738,6 +904,11 @@ color: #6699EE;
              </property>
              <item>
               <widget class="QRadioButton" name="rbVMove">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>Vertical</string>
                </property>
@@ -748,6 +919,11 @@ color: #6699EE;
              </item>
              <item>
               <widget class="QRadioButton" name="rbHMove">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>Horizontal</string>
                </property>
@@ -775,6 +951,11 @@ color: #6699EE;
              </property>
              <item>
               <widget class="QPushButton" name="btnRetract">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>Retract</string>
                </property>
@@ -782,6 +963,11 @@ color: #6699EE;
              </item>
              <item>
               <widget class="QPushButton" name="btnExtend">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>Extend</string>
                </property>
@@ -789,6 +975,11 @@ color: #6699EE;
              </item>
              <item>
               <widget class="QPushButton" name="btnStop">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>Stop</string>
                </property>
@@ -843,8 +1034,14 @@ color: #6699EE;
            </font>
           </property>
           <property name="styleSheet">
-           <string notr="true">color:#003399
-</string>
+           <string notr="true">::enabled {
+color:#003399;
+font-size:12pt;
+}
+::!enabled {
+color: #6699EE;
+font-size:12pt;
+}</string>
           </property>
           <property name="frameShape">
            <enum>QFrame::NoFrame</enum>
@@ -856,6 +1053,11 @@ color: #6699EE;
         </item>
         <item>
          <widget class="QLabel" name="label_60">
+          <property name="font">
+           <font>
+            <pointsize>9</pointsize>
+           </font>
+          </property>
           <property name="text">
            <string>The voltage regulator and at least one stepper motor must be calibrated before performing a scan.</string>
           </property>
@@ -894,6 +1096,11 @@ color: #6699EE;
           </item>
           <item>
            <widget class="Line" name="line_18">
+            <property name="font">
+             <font>
+              <pointsize>9</pointsize>
+             </font>
+            </property>
             <property name="orientation">
              <enum>Qt::Horizontal</enum>
             </property>
@@ -903,6 +1110,11 @@ color: #6699EE;
         </item>
         <item>
          <widget class="QRadioButton" name="rbVCalib">
+          <property name="font">
+           <font>
+            <pointsize>9</pointsize>
+           </font>
+          </property>
           <property name="text">
            <string>Vertical</string>
           </property>
@@ -913,6 +1125,11 @@ color: #6699EE;
         </item>
         <item>
          <widget class="QFrame" name="gbVCalib">
+          <property name="font">
+           <font>
+            <pointsize>9</pointsize>
+           </font>
+          </property>
           <property name="frameShape">
            <enum>QFrame::NoFrame</enum>
           </property>
@@ -939,6 +1156,11 @@ color: #6699EE;
                  <verstretch>0</verstretch>
                 </sizepolicy>
                </property>
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="maxLength">
                 <number>10</number>
                </property>
@@ -946,6 +1168,11 @@ color: #6699EE;
              </item>
              <item row="0" column="0">
               <widget class="QLabel" name="label">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>Upper:</string>
                </property>
@@ -959,6 +1186,11 @@ color: #6699EE;
                  <verstretch>0</verstretch>
                 </sizepolicy>
                </property>
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="maxLength">
                 <number>10</number>
                </property>
@@ -966,6 +1198,11 @@ color: #6699EE;
              </item>
              <item row="1" column="0">
               <widget class="QLabel" name="label_47">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>Lower:</string>
                </property>
@@ -973,6 +1210,11 @@ color: #6699EE;
              </item>
              <item row="1" column="2">
               <widget class="QLabel" name="label_46">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>mm</string>
                </property>
@@ -980,6 +1222,11 @@ color: #6699EE;
              </item>
              <item row="0" column="2">
               <widget class="QLabel" name="label_45">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>mm</string>
                </property>
@@ -987,6 +1234,11 @@ color: #6699EE;
              </item>
              <item row="1" column="4">
               <widget class="QPushButton" name="btnStartVCalib">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>Start Calibration</string>
                </property>
@@ -994,6 +1246,11 @@ color: #6699EE;
              </item>
              <item row="1" column="3">
               <spacer name="horizontalSpacer_10">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="orientation">
                 <enum>Qt::Horizontal</enum>
                </property>
@@ -1012,6 +1269,11 @@ color: #6699EE;
            </item>
            <item>
             <widget class="QLabel" name="lblVCalibError">
+             <property name="font">
+              <font>
+               <pointsize>9</pointsize>
+              </font>
+             </property>
              <property name="text">
               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;TextLabel&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
              </property>
@@ -1025,6 +1287,11 @@ color: #6699EE;
         </item>
         <item>
          <widget class="QRadioButton" name="rbHCalib">
+          <property name="font">
+           <font>
+            <pointsize>9</pointsize>
+           </font>
+          </property>
           <property name="text">
            <string>Horizontal</string>
           </property>
@@ -1032,6 +1299,11 @@ color: #6699EE;
         </item>
         <item>
          <widget class="QFrame" name="gbHCalib">
+          <property name="font">
+           <font>
+            <pointsize>9</pointsize>
+           </font>
+          </property>
           <property name="frameShape">
            <enum>QFrame::NoFrame</enum>
           </property>
@@ -1058,6 +1330,11 @@ color: #6699EE;
                  <verstretch>0</verstretch>
                 </sizepolicy>
                </property>
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="maxLength">
                 <number>10</number>
                </property>
@@ -1065,6 +1342,11 @@ color: #6699EE;
              </item>
              <item row="0" column="0">
               <widget class="QLabel" name="label_48">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>Upper:</string>
                </property>
@@ -1072,6 +1354,11 @@ color: #6699EE;
              </item>
              <item row="1" column="2">
               <widget class="QLabel" name="label_52">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>mm</string>
                </property>
@@ -1079,6 +1366,11 @@ color: #6699EE;
              </item>
              <item row="0" column="2">
               <widget class="QLabel" name="label_49">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>mm</string>
                </property>
@@ -1092,6 +1384,11 @@ color: #6699EE;
                  <verstretch>0</verstretch>
                 </sizepolicy>
                </property>
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="maxLength">
                 <number>10</number>
                </property>
@@ -1099,6 +1396,11 @@ color: #6699EE;
              </item>
              <item row="1" column="0">
               <widget class="QLabel" name="label_50">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>Lower:</string>
                </property>
@@ -1106,6 +1408,11 @@ color: #6699EE;
              </item>
              <item row="1" column="4">
               <widget class="QPushButton" name="btnStartHCalib">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>Start Calibration</string>
                </property>
@@ -1113,6 +1420,11 @@ color: #6699EE;
              </item>
              <item row="1" column="3">
               <spacer name="horizontalSpacer_14">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="orientation">
                 <enum>Qt::Horizontal</enum>
                </property>
@@ -1131,6 +1443,11 @@ color: #6699EE;
            </item>
            <item>
             <widget class="QLabel" name="lblHCalibError">
+             <property name="font">
+              <font>
+               <pointsize>9</pointsize>
+              </font>
+             </property>
              <property name="text">
               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;TextLabel&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
              </property>
@@ -1175,6 +1492,11 @@ color: #6699EE;
           </item>
           <item>
            <widget class="Line" name="line_19">
+            <property name="font">
+             <font>
+              <pointsize>9</pointsize>
+             </font>
+            </property>
             <property name="orientation">
              <enum>Qt::Horizontal</enum>
             </property>
@@ -1184,6 +1506,11 @@ color: #6699EE;
         </item>
         <item>
          <widget class="QFrame" name="gbVolCalib">
+          <property name="font">
+           <font>
+            <pointsize>9</pointsize>
+           </font>
+          </property>
           <property name="frameShape">
            <enum>QFrame::NoFrame</enum>
           </property>
@@ -1204,6 +1531,11 @@ color: #6699EE;
             <layout class="QGridLayout" name="gridLayout_9">
              <item row="0" column="0">
               <widget class="QLabel" name="label_18">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>Set voltage:</string>
                </property>
@@ -1217,6 +1549,11 @@ color: #6699EE;
                  <verstretch>0</verstretch>
                 </sizepolicy>
                </property>
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="maxLength">
                 <number>10</number>
                </property>
@@ -1224,6 +1561,11 @@ color: #6699EE;
              </item>
              <item row="0" column="2">
               <widget class="QLabel" name="label_19">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>V</string>
                </property>
@@ -1237,6 +1579,11 @@ color: #6699EE;
                  <verstretch>0</verstretch>
                 </sizepolicy>
                </property>
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="maxLength">
                 <number>10</number>
                </property>
@@ -1244,6 +1591,11 @@ color: #6699EE;
              </item>
              <item row="1" column="4">
               <widget class="QPushButton" name="btnAddVregPoint">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>Add Point</string>
                </property>
@@ -1251,6 +1603,11 @@ color: #6699EE;
              </item>
              <item row="1" column="0">
               <widget class="QLabel" name="label_55">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>Measured output:</string>
                </property>
@@ -1258,6 +1615,11 @@ color: #6699EE;
              </item>
              <item row="0" column="4">
               <widget class="QPushButton" name="btnSetVreg">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>Set</string>
                </property>
@@ -1265,6 +1627,11 @@ color: #6699EE;
              </item>
              <item row="1" column="2">
               <widget class="QLabel" name="label_20">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="text">
                 <string>kV</string>
                </property>
@@ -1272,6 +1639,11 @@ color: #6699EE;
              </item>
              <item row="0" column="3">
               <spacer name="horizontalSpacer_3">
+               <property name="font">
+                <font>
+                 <pointsize>9</pointsize>
+                </font>
+               </property>
                <property name="orientation">
                 <enum>Qt::Horizontal</enum>
                </property>
@@ -1290,6 +1662,11 @@ color: #6699EE;
            </item>
            <item>
             <widget class="QLabel" name="lblVolCalibError">
+             <property name="font">
+              <font>
+               <pointsize>9</pointsize>
+              </font>
+             </property>
              <property name="text">
               <string>TextLabel</string>
              </property>
@@ -1297,6 +1674,11 @@ color: #6699EE;
            </item>
            <item>
             <widget class="Line" name="line_4">
+             <property name="font">
+              <font>
+               <pointsize>9</pointsize>
+              </font>
+             </property>
              <property name="orientation">
               <enum>Qt::Horizontal</enum>
              </property>
@@ -1304,6 +1686,11 @@ color: #6699EE;
            </item>
            <item>
             <widget class="QLabel" name="label_58">
+             <property name="font">
+              <font>
+               <pointsize>9</pointsize>
+              </font>
+             </property>
              <property name="text">
               <string>Calibration points</string>
              </property>
@@ -1314,6 +1701,11 @@ color: #6699EE;
         </item>
         <item>
          <spacer name="verticalSpacer_2">
+          <property name="font">
+           <font>
+            <pointsize>9</pointsize>
+           </font>
+          </property>
           <property name="orientation">
            <enum>Qt::Vertical</enum>
           </property>
@@ -1343,7 +1735,14 @@ color: #6699EE;
            </font>
           </property>
           <property name="styleSheet">
-           <string notr="true">color:#003399</string>
+           <string notr="true">::enabled {
+color:#003399;
+font-size:12pt;
+}
+::!enabled {
+color: #6699EE;
+font-size:12pt;
+}</string>
           </property>
           <property name="frameShape">
            <enum>QFrame::NoFrame</enum>
@@ -1355,6 +1754,11 @@ color: #6699EE;
         </item>
         <item>
          <widget class="QLabel" name="label_64">
+          <property name="font">
+           <font>
+            <pointsize>9</pointsize>
+           </font>
+          </property>
           <property name="text">
            <string>Choose an output file and specify scan points.</string>
           </property>
@@ -1453,6 +1857,11 @@ color: #6699EE;
                 <layout class="QHBoxLayout" name="horizontalLayout_4">
                  <item>
                   <widget class="QPushButton" name="btnChooseFile">
+                   <property name="font">
+                    <font>
+                     <pointsize>9</pointsize>
+                    </font>
+                   </property>
                    <property name="text">
                     <string>Choose Output File</string>
                    </property>
@@ -1541,6 +1950,11 @@ color: #6699EE;
                 <layout class="QVBoxLayout" name="verticalLayout_4">
                  <item>
                   <widget class="QRadioButton" name="rbVScan">
+                   <property name="font">
+                    <font>
+                     <pointsize>9</pointsize>
+                    </font>
+                   </property>
                    <property name="text">
                     <string>Vertical</string>
                    </property>
@@ -1551,6 +1965,11 @@ color: #6699EE;
                  </item>
                  <item>
                   <widget class="QRadioButton" name="rbHScan">
+                   <property name="font">
+                    <font>
+                     <pointsize>9</pointsize>
+                    </font>
+                   </property>
                    <property name="text">
                     <string>Horizontal</string>
                    </property>
@@ -1558,6 +1977,11 @@ color: #6699EE;
                  </item>
                  <item>
                   <widget class="QRadioButton" name="rbBothScan">
+                   <property name="font">
+                    <font>
+                     <pointsize>9</pointsize>
+                    </font>
+                   </property>
                    <property name="text">
                     <string>Both</string>
                    </property>
@@ -1593,7 +2017,7 @@ color: #6699EE;
                  <property name="frameShadow">
                   <enum>QFrame::Raised</enum>
                  </property>
-                 <layout class="QVBoxLayout" name="verticalLayout_2">
+                 <layout class="QVBoxLayout" name="verticalLayout_2" stretch="0,0,0,0,1">
                   <property name="leftMargin">
                    <number>0</number>
                   </property>
@@ -1610,6 +2034,7 @@ color: #6699EE;
                    <widget class="QLabel" name="label_5">
                     <property name="font">
                      <font>
+                      <pointsize>9</pointsize>
                       <weight>75</weight>
                       <bold>true</bold>
                      </font>
@@ -1623,6 +2048,11 @@ color: #6699EE;
                    <layout class="QGridLayout" name="gridLayout_3">
                     <item row="0" column="0">
                      <widget class="QLabel" name="label_2">
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="text">
                        <string>Min:</string>
                       </property>
@@ -1636,6 +2066,11 @@ color: #6699EE;
                         <verstretch>0</verstretch>
                        </sizepolicy>
                       </property>
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="text">
                        <string/>
                       </property>
@@ -1646,6 +2081,11 @@ color: #6699EE;
                     </item>
                     <item row="0" column="2">
                      <widget class="QLabel" name="label_26">
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="text">
                        <string>mm</string>
                       </property>
@@ -1653,6 +2093,11 @@ color: #6699EE;
                     </item>
                     <item row="1" column="0">
                      <widget class="QLabel" name="label_3">
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="text">
                        <string>Max:</string>
                       </property>
@@ -1666,6 +2111,11 @@ color: #6699EE;
                         <verstretch>0</verstretch>
                        </sizepolicy>
                       </property>
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="alignment">
                        <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
                       </property>
@@ -1673,6 +2123,11 @@ color: #6699EE;
                     </item>
                     <item row="1" column="2">
                      <widget class="QLabel" name="label_27">
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="text">
                        <string>mm</string>
                       </property>
@@ -1680,6 +2135,11 @@ color: #6699EE;
                     </item>
                     <item row="2" column="0">
                      <widget class="QLabel" name="label_4">
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="text">
                        <string>Step:</string>
                       </property>
@@ -1693,6 +2153,11 @@ color: #6699EE;
                         <verstretch>0</verstretch>
                        </sizepolicy>
                       </property>
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="alignment">
                        <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
                       </property>
@@ -1700,6 +2165,11 @@ color: #6699EE;
                     </item>
                     <item row="2" column="2">
                      <widget class="QLabel" name="label_28">
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="text">
                        <string>mm</string>
                       </property>
@@ -1709,6 +2179,11 @@ color: #6699EE;
                   </item>
                   <item>
                    <widget class="QLabel" name="label_6">
+                    <property name="font">
+                     <font>
+                      <pointsize>9</pointsize>
+                     </font>
+                    </property>
                     <property name="text">
                      <string>Voltage</string>
                     </property>
@@ -1718,6 +2193,11 @@ color: #6699EE;
                    <layout class="QGridLayout" name="gridLayout">
                     <item row="1" column="0">
                      <widget class="QLabel" name="label_7">
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="text">
                        <string>Min:</string>
                       </property>
@@ -1731,6 +2211,11 @@ color: #6699EE;
                         <verstretch>0</verstretch>
                        </sizepolicy>
                       </property>
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="alignment">
                        <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
                       </property>
@@ -1738,6 +2223,11 @@ color: #6699EE;
                     </item>
                     <item row="3" column="0">
                      <widget class="QLabel" name="label_9">
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="text">
                        <string>Step:</string>
                       </property>
@@ -1751,6 +2241,11 @@ color: #6699EE;
                         <verstretch>0</verstretch>
                        </sizepolicy>
                       </property>
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="alignment">
                        <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
                       </property>
@@ -1758,6 +2253,11 @@ color: #6699EE;
                     </item>
                     <item row="2" column="0">
                      <widget class="QLabel" name="label_8">
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="text">
                        <string>Max:</string>
                       </property>
@@ -1771,6 +2271,11 @@ color: #6699EE;
                         <verstretch>0</verstretch>
                        </sizepolicy>
                       </property>
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="alignment">
                        <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
                       </property>
@@ -1778,6 +2283,11 @@ color: #6699EE;
                     </item>
                     <item row="3" column="2">
                      <widget class="QLabel" name="label_34">
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="text">
                        <string>kV</string>
                       </property>
@@ -1785,6 +2295,11 @@ color: #6699EE;
                     </item>
                     <item row="1" column="2">
                      <widget class="QLabel" name="label_32">
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="text">
                        <string>kV</string>
                       </property>
@@ -1792,6 +2307,11 @@ color: #6699EE;
                     </item>
                     <item row="2" column="2">
                      <widget class="QLabel" name="label_33">
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="text">
                        <string>kV</string>
                       </property>
@@ -1801,6 +2321,11 @@ color: #6699EE;
                   </item>
                   <item>
                    <widget class="QLabel" name="lblVScanError">
+                    <property name="font">
+                     <font>
+                      <pointsize>9</pointsize>
+                     </font>
+                    </property>
                     <property name="text">
                      <string>TextLabel</string>
                     </property>
@@ -1827,7 +2352,7 @@ color: #6699EE;
                  <property name="frameShadow">
                   <enum>QFrame::Raised</enum>
                  </property>
-                 <layout class="QVBoxLayout" name="verticalLayout">
+                 <layout class="QVBoxLayout" name="verticalLayout" stretch="0,0,0,0,1">
                   <property name="leftMargin">
                    <number>0</number>
                   </property>
@@ -1844,6 +2369,7 @@ color: #6699EE;
                    <widget class="QLabel" name="label_10">
                     <property name="font">
                      <font>
+                      <pointsize>9</pointsize>
                       <weight>75</weight>
                       <bold>true</bold>
                      </font>
@@ -1863,6 +2389,11 @@ color: #6699EE;
                         <verstretch>0</verstretch>
                        </sizepolicy>
                       </property>
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="alignment">
                        <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
                       </property>
@@ -1870,6 +2401,11 @@ color: #6699EE;
                     </item>
                     <item row="0" column="0">
                      <widget class="QLabel" name="label_11">
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="text">
                        <string>Min:</string>
                       </property>
@@ -1877,6 +2413,11 @@ color: #6699EE;
                     </item>
                     <item row="1" column="0">
                      <widget class="QLabel" name="label_12">
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="text">
                        <string>Max:</string>
                       </property>
@@ -1889,6 +2430,11 @@ color: #6699EE;
                         <horstretch>0</horstretch>
                         <verstretch>0</verstretch>
                        </sizepolicy>
+                      </property>
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
                       </property>
                       <property name="alignment">
                        <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
@@ -1903,6 +2449,11 @@ color: #6699EE;
                         <verstretch>0</verstretch>
                        </sizepolicy>
                       </property>
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="alignment">
                        <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
                       </property>
@@ -1910,6 +2461,11 @@ color: #6699EE;
                     </item>
                     <item row="2" column="0">
                      <widget class="QLabel" name="label_13">
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="text">
                        <string>Step:</string>
                       </property>
@@ -1917,6 +2473,11 @@ color: #6699EE;
                     </item>
                     <item row="0" column="2">
                      <widget class="QLabel" name="label_29">
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="text">
                        <string>mm</string>
                       </property>
@@ -1924,6 +2485,11 @@ color: #6699EE;
                     </item>
                     <item row="1" column="2">
                      <widget class="QLabel" name="label_30">
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="text">
                        <string>mm</string>
                       </property>
@@ -1931,6 +2497,11 @@ color: #6699EE;
                     </item>
                     <item row="2" column="2">
                      <widget class="QLabel" name="label_31">
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="text">
                        <string>mm</string>
                       </property>
@@ -1940,6 +2511,11 @@ color: #6699EE;
                   </item>
                   <item>
                    <widget class="QLabel" name="label_14">
+                    <property name="font">
+                     <font>
+                      <pointsize>9</pointsize>
+                     </font>
+                    </property>
                     <property name="text">
                      <string>Voltage</string>
                     </property>
@@ -1955,6 +2531,11 @@ color: #6699EE;
                         <verstretch>0</verstretch>
                        </sizepolicy>
                       </property>
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="alignment">
                        <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
                       </property>
@@ -1962,6 +2543,11 @@ color: #6699EE;
                     </item>
                     <item row="1" column="0">
                      <widget class="QLabel" name="label_16">
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="text">
                        <string>Max:</string>
                       </property>
@@ -1975,6 +2561,11 @@ color: #6699EE;
                         <verstretch>0</verstretch>
                        </sizepolicy>
                       </property>
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="alignment">
                        <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
                       </property>
@@ -1982,6 +2573,11 @@ color: #6699EE;
                     </item>
                     <item row="0" column="0">
                      <widget class="QLabel" name="label_15">
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="text">
                        <string>Min:</string>
                       </property>
@@ -1989,6 +2585,11 @@ color: #6699EE;
                     </item>
                     <item row="2" column="0">
                      <widget class="QLabel" name="label_17">
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="text">
                        <string>Step:</string>
                       </property>
@@ -2002,6 +2603,11 @@ color: #6699EE;
                         <verstretch>0</verstretch>
                        </sizepolicy>
                       </property>
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="alignment">
                        <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
                       </property>
@@ -2009,6 +2615,11 @@ color: #6699EE;
                     </item>
                     <item row="0" column="2">
                      <widget class="QLabel" name="label_35">
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="text">
                        <string>kV</string>
                       </property>
@@ -2016,6 +2627,11 @@ color: #6699EE;
                     </item>
                     <item row="1" column="2">
                      <widget class="QLabel" name="label_36">
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="text">
                        <string>kV</string>
                       </property>
@@ -2023,6 +2639,11 @@ color: #6699EE;
                     </item>
                     <item row="2" column="2">
                      <widget class="QLabel" name="label_37">
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
+                      </property>
                       <property name="text">
                        <string>kV</string>
                       </property>
@@ -2032,6 +2653,11 @@ color: #6699EE;
                   </item>
                   <item>
                    <widget class="QLabel" name="lblHScanError">
+                    <property name="font">
+                     <font>
+                      <pointsize>9</pointsize>
+                     </font>
+                    </property>
                     <property name="text">
                      <string>TextLabel</string>
                     </property>
@@ -2112,6 +2738,7 @@ color: #6699EE;
                  <property name="font">
                   <font>
                    <family>MS Shell Dlg 2</family>
+                   <pointsize>9</pointsize>
                    <italic>false</italic>
                   </font>
                  </property>
@@ -2125,6 +2752,7 @@ color: #6699EE;
                  <property name="font">
                   <font>
                    <family>MS Shell Dlg 2</family>
+                   <pointsize>9</pointsize>
                    <italic>false</italic>
                   </font>
                  </property>
@@ -2143,6 +2771,11 @@ color: #6699EE;
                    <property name="enabled">
                     <bool>false</bool>
                    </property>
+                   <property name="font">
+                    <font>
+                     <pointsize>9</pointsize>
+                    </font>
+                   </property>
                    <property name="text">
                     <string>Start Scan</string>
                    </property>
@@ -2152,6 +2785,11 @@ color: #6699EE;
                   <widget class="QPushButton" name="btnStopScan">
                    <property name="enabled">
                     <bool>false</bool>
+                   </property>
+                   <property name="font">
+                    <font>
+                     <pointsize>9</pointsize>
+                    </font>
                    </property>
                    <property name="text">
                     <string>Stop Scan</string>
@@ -2268,6 +2906,13 @@ color: #6699EE;
                  <layout class="QHBoxLayout" name="horizontalLayout_19">
                   <item>
                    <widget class="QRadioButton" name="rbVScanStatus">
+                    <property name="font">
+                     <font>
+                      <pointsize>9</pointsize>
+                      <weight>75</weight>
+                      <bold>true</bold>
+                     </font>
+                    </property>
                     <property name="styleSheet">
                      <string notr="true">font-weight: bold</string>
                     </property>
@@ -2281,6 +2926,13 @@ color: #6699EE;
                   </item>
                   <item>
                    <widget class="QRadioButton" name="rbHScanStatus">
+                    <property name="font">
+                     <font>
+                      <pointsize>9</pointsize>
+                      <weight>75</weight>
+                      <bold>true</bold>
+                     </font>
+                    </property>
                     <property name="styleSheet">
                      <string notr="true">font-weight: bold</string>
                     </property>
@@ -2307,6 +2959,11 @@ color: #6699EE;
                           <horstretch>0</horstretch>
                           <verstretch>0</verstretch>
                          </sizepolicy>
+                        </property>
+                        <property name="font">
+                         <font>
+                          <pointsize>9</pointsize>
+                         </font>
                         </property>
                         <property name="text">
                          <string>V</string>
@@ -2347,6 +3004,11 @@ color: #6699EE;
                         <horstretch>0</horstretch>
                         <verstretch>0</verstretch>
                        </sizepolicy>
+                      </property>
+                      <property name="font">
+                       <font>
+                        <pointsize>9</pointsize>
+                       </font>
                       </property>
                       <property name="text">
                        <string>mm</string>

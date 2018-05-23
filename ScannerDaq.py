@@ -1454,11 +1454,9 @@ class DaqView:
         self._window.ui.btnStopScan.setEnabled(False)
 
         self._window.tabCalib.setEnabled(True)
+        self._window.on_calib_rb_changed()
         self._window.enable_scan_controls(True)
-        self._window.ui.gbVCalib.setEnabled(True)
-        self._window.ui.gbHCalib.setEnabled(True)
-
-
+        
         # call this to make sure the proper controls stay disabled
         self.check_calibration()
 
