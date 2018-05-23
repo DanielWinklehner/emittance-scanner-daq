@@ -659,7 +659,8 @@ class DaqView:
 
         # scan buttons
         self._window.ui.btnChooseFile.clicked.connect(self.choose_file)
-        self._window.ui.btnStartStopScan.clicked.connect(self.scan)
+        self._window.ui.btnStartScan.clicked.connect(self.scan)
+        self._window.ui.btnStopScan.clicked.connect(self.stop_scan)
         self._window.ui.rbVScan.toggled.connect(self.on_scan_rb_changed)
         self._window.ui.rbHScan.toggled.connect(self.on_scan_rb_changed)
 
@@ -712,7 +713,7 @@ class DaqView:
         self.update_display_values()
 
     def test_vreg(self):
-        val = np.random.uniform(-1, 1, 1)[0]
+        val = np.random.uniform(-1, 1)
         self._comm.add_message_to_queue('vset vset {0:.2f}'.format(val))
         print('Setting voltage regulator to {0:.2f}'.format(val))
 
@@ -785,6 +786,9 @@ class DaqView:
         self._window.btnConnect.setText('Stop')
         self._connected_to_server = True
         self._window.tabCalib.setEnabled(True)
+        self._window.ui.lblServerStatus.setStyleSheet('color: green')
+        self._window.ui.lblServerStatus.setText('Connected')
+
         self.check_calibration()  # case where user is reconnecting
 
     def shutdown_communication(self):
@@ -816,6 +820,9 @@ class DaqView:
         self._window.tabCalib.setEnabled(False)
         self._window.tabScan.setEnabled(False)
         self._connected_to_server = False
+
+        self._window.ui.lblServerStatus.setStyleSheet('color: red')
+        self._window.ui.lblServerStatus.setText('Not connected')
 
         # reset devices
         self._dm.devices['vstepper']['calibration'] = [(None, None), (None, None)]
@@ -1040,7 +1047,8 @@ class DaqView:
         self._calibration_thread.start()
         self._window.tabCalib.setEnabled(False)
         self._window.tabScan.setEnabled(False)
-        self._window.ui.gbSteppers.setEnabled(False)
+        self._window.ui.gbVCalib.setEnabled(False)
+        self._window.ui.gbHCalib.setEnabled(False)
 
     def set_stepper_calibration(self, stepper, upper, lower):
         # send command to extend stepper
@@ -1074,7 +1082,11 @@ class DaqView:
 
         self.check_calibration()
         self._window.tabCalib.setEnabled(True)
-        self._window.ui.gbSteppers.setEnabled(True)
+
+        self._window.ui.gbVCalib.setEnabled(True)
+        self._window.ui.gbHCalib.setEnabled(True)
+
+        self._window.on_calib_rb_changed()
 
     def on_vreg_calibration_textbox_change(self):
         # don't show error if user hasn't entered values
@@ -1189,7 +1201,8 @@ class DaqView:
     def on_scan_textbox_change(self):
         """ Function that calculates the number of scan points """
         self._window.ui.lblScanPoints.setText('Total points: --')
-        self._window.ui.btnStartStopScan.setEnabled(False)
+        self._window.ui.btnStartScan.setEnabled(False)
+        self._window.ui.btnStopScan.setEnabled(False)
 
         self._dm.devices['vstepper']['scan'] = [None]
         self._dm.devices['hstepper']['scan'] = [None]
@@ -1282,7 +1295,12 @@ class DaqView:
 
             # and if the user has selected a valid file, then they may start a scan
             if self._scanfile != '':
-                self._window.ui.btnStartStopScan.setEnabled(True)
+                self._window.ui.btnStartScan.setEnabled(True)
+
+    def stop_scan(self):
+        self._comm.clear_queue()
+        self._daq.terminate()
+        self.stepper_com('\x1b')
 
     def scan(self):
         """ Called when user presses the start scan button. Calculates the
@@ -1290,19 +1308,13 @@ class DaqView:
             which runs in its own thread
         """
 
-        if self._window.ui.btnStartStopScan.text() == 'Stop Scan':
-            self._window.ui.btnStartStopScan.setText('Start Scan')
-            self._comm.clear_queue()
-            self._daq.terminate()
-            self.stepper_com('\x1b')
-            return
-
-        self._window.ui.btnStartStopScan.setText('Stop Scan')
-
         # we call this again because the user can re-calibrate between scans
         # without changing the textboxes, so the scan points wouldn't be set
         # correctly without it
         self.on_scan_textbox_change()
+
+        self._window.ui.btnStartScan.setEnabled(False)
+        self._window.ui.btnStopScan.setEnabled(True)
 
         # if the user has modified the COM delay setting
         com_delay = 0.5
@@ -1330,7 +1342,8 @@ class DaqView:
         # disable controls that could interfere with the scan
         self._window.tabCalib.setEnabled(False)
         self._window.enable_scan_controls(False)
-        self._window.ui.gbSteppers.setEnabled(False)
+        self._window.ui.gbVCalib.setEnabled(False)
+        self._window.ui.gbHCalib.setEnabled(False)
 
     def on_scan_rb_changed(self):
         """ Update the total number of points when user changes scan selection """
@@ -1437,10 +1450,14 @@ class DaqView:
         """ Safely re-enable the gui once the thread is done. This is called
             when the QThread holding the DAQ object emits its finished signal.
         """
-        self._window.ui.btnStartStopScan.setText('Start Scan')
+        self._window.ui.btnStartScan.setEnabled(True)
+        self._window.ui.btnStopScan.setEnabled(False)
+
         self._window.tabCalib.setEnabled(True)
         self._window.enable_scan_controls(True)
-        self._window.ui.gbSteppers.setEnabled(True)
+        self._window.ui.gbVCalib.setEnabled(True)
+        self._window.ui.gbHCalib.setEnabled(True)
+
 
         # call this to make sure the proper controls stay disabled
         self.check_calibration()

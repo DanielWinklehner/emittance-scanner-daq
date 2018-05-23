@@ -4,13 +4,18 @@ Server and GUI for operating the MIST-1 emittance scanners
 
 ### TODO
 
+ - Data output
+    - Might want to save voltage regulator std. dev of samples.
+    - User-adjustable number of voltage regulator and pico sampling
+
+
  - Error handling
-    - (Done: User cannot enter values exceeding stepper limits) ~~Code could get stuck if user tries to set a value that the device can't output~~
+    - (Done: User cannot enter values exceeding stepper limits and vreg limits are now user-adjustable) ~~Code could get stuck if user tries to set a value that the device can't output~~
     - No defined action if user exits/stops communication during calibration
 
 
  - Bugs
-    - Slow communication can cause messages to pile up (e.g. 'vset 10000poll') which will stop communication. Seems to only happen very rarely
+    - Slow communication can cause messages to pile up (e.g. 'vset 10000poll') which will stop communication. This is hard to reproduce and only happens rarely.
     - (Done) ~~Voltage regulator calibration not implemented (multi-point calibration preferred)~~
     - 1px offset in bottom row of scan histograms... No discernable negative effects other than it is annoying
 
@@ -25,5 +30,5 @@ Server and GUI for operating the MIST-1 emittance scanners
        2. ~~Devices: calibration distances~~
        3. ~~Scans: All fields could be saved~~
     - (Done) ~~Fill in missing error message blocks~~
-    - Fill in scan status labels & estimate time remaining
+    - (Done) ~~Fill in scan status labels & estimate time remaining~~
     - Automatically repeat calibration at user-specified intervals
