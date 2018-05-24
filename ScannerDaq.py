@@ -1458,6 +1458,7 @@ class DaqView:
         file_error = False
         metadata_error = False
         textbox_entry_error = False
+        textbox_empty = False  # don't want to get mad at user while they are still entering data
 
         self._window.ui.lblScanPoints.setText('Total points: --')
         self._window.ui.btnStartScan.setEnabled(False)
@@ -1525,6 +1526,8 @@ class DaqView:
                     if '' not in txtlist:
                         self._window.ui.lblScanError.setText('Error: Bad input for {} scan.'.format(settings['title']))
                         self._window.ui.lblScanError.show()
+                    else:
+                        textbox_empty = True
                     settings['error_bool'] = True
                     textbox_entry_error = True
 
@@ -1578,6 +1581,11 @@ class DaqView:
 
         # don't enable the scan if we have any errors
         if True in [file_error, metadata_error, textbox_entry_error]:
+            # hide the error label if the only error is a textbox error and
+            # they haven't finished filling in the values
+            if textbox_entry_error and textbox_empty and \
+                    True not in [metadata_error, file_error]:
+                self._window.ui.lblScanError.hide()
             return
 
         self._window.ui.lblScanError.hide()

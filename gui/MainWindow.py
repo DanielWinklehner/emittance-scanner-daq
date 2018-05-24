@@ -41,6 +41,7 @@ class MainWindow(QMainWindow):
 
         # scan page
         self.ui.lblScanError.hide()
+        self.ui.lblMetadataError.hide()
 
         # the only way these two lines will work is if the target
         # label has ignored QSizePolicy. Otherwise setting the pixmap
