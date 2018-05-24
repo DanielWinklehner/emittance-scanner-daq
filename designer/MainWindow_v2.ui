@@ -1791,7 +1791,7 @@ font-size:12pt;
            <bool>false</bool>
           </property>
           <widget class="QWidget" name="layoutWidget">
-           <layout class="QVBoxLayout" name="verticalLayout_8" stretch="0,0,0,0,0,0,0">
+           <layout class="QVBoxLayout" name="verticalLayout_8" stretch="0,0,0,0,0,0,0,0">
             <property name="sizeConstraint">
              <enum>QLayout::SetDefaultConstraint</enum>
             </property>
@@ -1801,7 +1801,7 @@ font-size:12pt;
                <number>5</number>
               </property>
               <item>
-               <widget class="QLabel" name="label_65">
+               <widget class="QLabel" name="lblFileOptionsHeader">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
                   <horstretch>0</horstretch>
@@ -2047,7 +2047,7 @@ color: #6699EE;
                <number>5</number>
               </property>
               <item>
-               <widget class="QLabel" name="label_66">
+               <widget class="QLabel" name="lblScanPointsHeader">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
                   <horstretch>0</horstretch>
@@ -2170,7 +2170,7 @@ color: #6699EE;
                  <property name="frameShadow">
                   <enum>QFrame::Raised</enum>
                  </property>
-                 <layout class="QVBoxLayout" name="verticalLayout_2" stretch="0,0,0,0,1">
+                 <layout class="QVBoxLayout" name="verticalLayout_2" stretch="0,0,0,0">
                   <property name="leftMargin">
                    <number>0</number>
                   </property>
@@ -2472,21 +2472,6 @@ color: #6699EE;
                     </item>
                    </layout>
                   </item>
-                  <item>
-                   <widget class="QLabel" name="lblVScanError">
-                    <property name="font">
-                     <font>
-                      <pointsize>9</pointsize>
-                     </font>
-                    </property>
-                    <property name="text">
-                     <string>TextLabel</string>
-                    </property>
-                    <property name="wordWrap">
-                     <bool>true</bool>
-                    </property>
-                   </widget>
-                  </item>
                  </layout>
                 </widget>
                </item>
@@ -2505,7 +2490,7 @@ color: #6699EE;
                  <property name="frameShadow">
                   <enum>QFrame::Raised</enum>
                  </property>
-                 <layout class="QVBoxLayout" name="verticalLayout" stretch="0,0,0,0,1">
+                 <layout class="QVBoxLayout" name="verticalLayout" stretch="0,0,0,0">
                   <property name="leftMargin">
                    <number>0</number>
                   </property>
@@ -2804,21 +2789,6 @@ color: #6699EE;
                     </item>
                    </layout>
                   </item>
-                  <item>
-                   <widget class="QLabel" name="lblHScanError">
-                    <property name="font">
-                     <font>
-                      <pointsize>9</pointsize>
-                     </font>
-                    </property>
-                    <property name="text">
-                     <string>TextLabel</string>
-                    </property>
-                    <property name="wordWrap">
-                     <bool>true</bool>
-                    </property>
-                   </widget>
-                  </item>
                  </layout>
                 </widget>
                </item>
@@ -2968,6 +2938,21 @@ color: #6699EE;
                 </layout>
                </item>
               </layout>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="lblScanError">
+              <property name="font">
+               <font>
+                <pointsize>9</pointsize>
+               </font>
+              </property>
+              <property name="text">
+               <string>TextLabel</string>
+              </property>
+              <property name="wordWrap">
+               <bool>true</bool>
+              </property>
              </widget>
             </item>
             <item>

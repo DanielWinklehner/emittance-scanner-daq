@@ -40,8 +40,7 @@ class MainWindow(QMainWindow):
         self.ui.lblVolCalibError.hide()
 
         # scan page
-        self.ui.lblVScanError.hide()
-        self.ui.lblHScanError.hide()
+        self.ui.lblScanError.hide()
 
         # the only way these two lines will work is if the target
         # label has ignored QSizePolicy. Otherwise setting the pixmap

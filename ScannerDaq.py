@@ -1257,9 +1257,15 @@ class DaqView:
 
             self._vreg_layouts.append(layout)
 
-    #####################
-    # Scan page functions
-    #####################
+    #######################
+    #                     #
+    # Scan page functions #
+    #                     #
+    #######################
+
+    # ------------
+    # File options
+    # ------------
 
     def choose_file(self):
         """ Called when user presses choose output file button """
@@ -1270,15 +1276,45 @@ class DaqView:
                 fname += '.csv'
 
             self._scanfile = fname
-            #self._window.ui.lblSaveFile.setText('Saving output to:\n{}'.format(fname))
 
             # the start/stop scan button is enabled if the textboxes are valid
             # and the file is set
-            #self.check_scan_valid()
-            self.on_scan_rb_changed()
+            self.check_scan_valid()
+            self.update_scan_file_summary()
 
     def on_save_image_checkbox_changed(self):
-        self.on_scan_rb_changed()
+        """ Select/unselect the option to save an image of the scan """
+        self.update_scan_file_summary()
+
+    def on_scan_rb_changed(self):
+        """ Update the total number of points when user changes scan selection """
+        self.check_scan_valid()
+        self.update_scan_file_summary()
+
+    def update_scan_file_summary(self):
+        """ Display the output file names in the GUI """
+        text = ''
+
+        if self._scanfile == '':
+            return
+
+        _fname = self._scanfile[:-4]
+
+        if self._window.ui.rbBothScan.isChecked():
+            text = 'Saving output to:\n{0}_v.csv\n{0}_h.csv'.format(_fname)
+            if self._window.ui.chkSaveImage.isChecked():
+                text += '\nSaving images to:\n{0}_v.png\n{0}_h.png'.format(_fname)
+
+        else:
+            text = 'Saving output to:\n{}'.format(self._scanfile)
+            if self._window.ui.chkSaveImage.isChecked():
+                text += '\nSaving an image to:\n{}.png'.format(_fname)
+
+        self._window.ui.lblSaveFile.setText(text)
+
+    # --------
+    # Metadata
+    # --------
 
     def add_metadata_field(self, info_dict={}):
         # if nothing is passed as an argument, create field from gui
@@ -1334,11 +1370,11 @@ class DaqView:
         }
 
         self.update_metadata()
-        self.on_scan_rb_changed()
+        self.check_scan_valid()
 
     def on_metadata_text_changed(self, field):
         self._metadata[field]['value'] = self._metadata[field]['text'].text()
-        self.on_scan_rb_changed() # this checks if the scan is valid
+        self.check_scan_valid()
 
     def update_metadata(self):
         clear_layout(self._window.ui.layoutMetadata)
@@ -1404,10 +1440,25 @@ class DaqView:
             new_index += 1
 
         self.update_metadata()
-        self.on_scan_rb_changed()
+        self.check_scan_valid()
+
+    # ------------------
+    # Scan point options
+    # ------------------
 
     def on_scan_textbox_change(self):
-        """ Function that calculates the number of scan points """
+        """ Called when the user changes any text in the min/max/step boxes """
+        self.check_scan_valid()
+
+    def check_scan_valid(self):
+        """ Validate all controls on the scan page to determine if the user
+            may start a scan.
+        """
+        # enumerate all error states
+        file_error = False
+        metadata_error = False
+        textbox_entry_error = False
+
         self._window.ui.lblScanPoints.setText('Total points: --')
         self._window.ui.btnStartScan.setEnabled(False)
         self._window.ui.btnStopScan.setEnabled(False)
@@ -1416,10 +1467,28 @@ class DaqView:
         self._dm.devices['hstepper']['scan'] = [None]
         self._dm.devices['vreg']['scan'] = [None, None]
 
+        # check if we have a file name (easy)
+        if self._scanfile == '':
+            self._window.ui.lblScanError.setText('Error: No output file selected.')
+            self._window.ui.lblScanError.show()
+            file_error = True
+
+        # check if we have filled in all mandatory metadata fields (also easy)
+        for field_name, info in self._metadata.items():
+            if info['mandatory']:
+                if info['value'] == '':
+                    info['text'].setStyleSheet('background-color: #FFBBBB')
+                    self._window.ui.lblScanError.setText('Error: A mandatory metadata field is empty.')
+                    self._window.ui.lblScanError.show()
+                    metadata_error = True
+                else:
+                    info['text'].setStyleSheet('')
+
+        # check if we can make valid scan ranges (oh...)
         vertical_settings = {
+            'title': 'Vertical',
             'txts': ['VMinPos', 'VMaxPos', 'VStepPos', 'VMinV', 'VMaxV', 'VStepV'],
             'rb': self._window.ui.rbVScan,
-            'error': self._window.ui.lblVScanError,
             'error_bool': False,
             'calib_state': self._vercalib,
             'device': 'vstepper',
@@ -1428,9 +1497,9 @@ class DaqView:
         }
 
         horizontal_settings = {
+            'title': 'Horizontal',
             'txts': ['HMinPos', 'HMaxPos', 'HStepPos', 'HMinV', 'HMaxV', 'HStepV'],
             'rb': self._window.ui.rbHScan,
-            'error': self._window.ui.lblHScanError,
             'error_bool': False,
             'calib_state': self._horcalib,
             'device': 'hstepper',
@@ -1454,18 +1523,20 @@ class DaqView:
                     # exec & eval in the same function??? Watch out!!!
                     txtlist = [eval('self._window.ui.txt{}.text()'.format(_), {'self':self}) for _ in settings['txts']]
                     if '' not in txtlist:
-                        settings['error'].setText('Bad input.')
-                        settings['error'].show()
+                        self._window.ui.lblScanError.setText('Error: Bad input for {} scan.'.format(settings['title']))
+                        self._window.ui.lblScanError.show()
                     settings['error_bool'] = True
+                    textbox_entry_error = True
 
                 if not settings['error_bool']:
                     # user input should be sequential, and having a step of 0 will cause a divide by zero error
                     if (ns['_min'] > ns['_max']) or (ns['_minv'] > ns['_maxv']) or \
                             ns['_min'] == ns['_max'] or ns['_minv'] == ns['_maxv'] or \
                             ns['_step'] == 0 or ns['_stepv'] == 0:
-                        settings['error'].setText('Bad values entered.')
-                        settings['error'].show()
+                        self._window.ui.lblScanError.setText('Error: Bad values entered for {} scan.'.format(settings['title']))
+                        self._window.ui.lblScanError.show()
                         settings['error_bool'] = True
+                        textbox_entry_error = True
 
                     if settings['calib_state']:
                         # stepper motors are limited by their endpoint calibration
@@ -1476,13 +1547,12 @@ class DaqView:
                                 ns['_minv'] < self._dm.devices['vreg']['min'] or \
                                 ns['_maxv'] > self._dm.devices['vreg']['max']:
 
-                            settings['error'].setText('Values exceed device limits.')
-                            settings['error'].show()
+                            self._window.ui.lblScanError.setText('Error: Values exceed device limits in {} scan.'.format(settings['title']))
+                            self._window.ui.lblScanError.show()
                             settings['error_bool'] = True
+                            textbox_entry_error = True
 
                 if not settings['error_bool']:
-                    settings['error'].hide()
-
                     # we create the list of vertical points, undoing the user-entered values
                     steprange = arange_inclusive(ns['_min'], ns['_max'], ns['_step'])
                     volrange = arange_inclusive(ns['_minv'], ns['_maxv'], ns['_stepv'])
@@ -1495,55 +1565,23 @@ class DaqView:
                     settings['points'] = len(self._dm.devices[settings['device']]['scan'][0]) * \
                         len(self._dm.devices['vreg']['scan'][settings['vreg_index']])
 
-        if not (vertical_settings['error_bool'] or horizontal_settings['error_bool']):
-            # if we made it here, then we can update the # of points label
+        if  vertical_settings['error_bool'] or horizontal_settings['error_bool']:
+            # one scan was valid but the other was not. So close...
+            textbox_entry_error = True
+
+        # even if something else is wrong, we want to update the # of points
+        # if the textboxes are valid
+        if not textbox_entry_error:
             self._window.ui.lblScanPoints.setText(
-                    'Total points: {}'.format(
-                        vertical_settings['points'] + horizontal_settings['points']))
+                'Total points: {}'.format(
+                    vertical_settings['points'] + horizontal_settings['points']))
 
-            if self.check_scan_valid():
-                self._window.ui.btnStartScan.setEnabled(True)
-
-    def stop_scan(self):
-        self._comm.clear_queue()
-        self._daq.terminate()
-        self.stepper_com('\x1b')
-
-    def check_scan_valid(self):
-        # check if we have a file name
-        if self._scanfile == '':
-            return False
-
-        # check if we have filled in all mandatory metadata fields
-        for field_name, info in self._metadata.items():
-            if info['mandatory']:
-                if info['value'] == '':
-                    return False
-
-        return True
-
-    def on_scan_rb_changed(self):
-        """ Update the total number of points when user changes scan selection """
-        self.on_scan_textbox_change()
-
-        text = ''
-
-        if self._scanfile == '':
+        # don't enable the scan if we have any errors
+        if True in [file_error, metadata_error, textbox_entry_error]:
             return
 
-        _fname = self._scanfile[:-4]
-
-        if self._window.ui.rbBothScan.isChecked():
-            text = 'Saving output to:\n{0}_v.csv\n{0}_h.csv'.format(_fname)
-            if self._window.ui.chkSaveImage.isChecked():
-                text += '\nSaving images to:\n{0}_v.png\n{0}_h.png'.format(_fname)
-
-        else:
-            text = 'Saving output to:\n{}'.format(self._scanfile)
-            if self._window.ui.chkSaveImage.isChecked():
-                text += '\nSaving an image to:\n{}.png'.format(_fname)
-
-        self._window.ui.lblSaveFile.setText(text)
+        self._window.ui.lblScanError.hide()
+        self._window.ui.btnStartScan.setEnabled(True)
 
     def on_scan_status_rb_changed(self):
         """ Update the plot when the user switches views """
@@ -1558,16 +1596,20 @@ class DaqView:
             except AttributeError:
                 self._window.draw_scan_hist(None)
 
+    # -----------------------
+    # Actually doing the scan
+    # -----------------------
+
     def scan(self):
         """ Called when user presses the start scan button. Calculates the
             points to scan from the textboxes, and creates a Daq object
             which runs in its own thread
         """
 
-        # we call this again because the user can re-calibrate between scans
-        # without changing the textboxes, so the scan points wouldn't be set
-        # correctly without it
-        self.on_scan_textbox_change()
+        # we call this again not to check for validity of the form, but
+        # because the user can re-calibrate devices between scans
+        # without changing the textboxes, making the scan points incorrect.
+        self.check_scan_valid()
 
         self._window.ui.btnStartScan.setEnabled(False)
         self._window.ui.btnStopScan.setEnabled(True)
@@ -1600,6 +1642,11 @@ class DaqView:
         self._window.enable_scan_controls(False)
         self._window.ui.gbVCalib.setEnabled(False)
         self._window.ui.gbHCalib.setEnabled(False)
+
+    def stop_scan(self):
+        self._comm.clear_queue()
+        self._daq.terminate()
+        self.stepper_com('\x1b')
 
     def on_scan_start(self, time, kind):
         # create file preamble
@@ -1634,7 +1681,7 @@ class DaqView:
             f.write(preamble)
 
     def on_scan_pt(self, pt, kind):
-        """ update the file and plot label when a new point comes in """
+        """ update the file and GUI when a new point comes in """
         if self._window.ui.rbVScanStatus.isChecked():
             self._window.draw_scan_hist(self._daq.vdata)
         else:
@@ -1671,6 +1718,7 @@ class DaqView:
             self.save_scan_image()
 
     def save_scan_image(self):
+        """ Draw a 2D histogram of scan data as a QPixmap and save the output """
         both = self._window.ui.rbBothScan.isChecked()
 
         if self._window.ui.rbVScan.isChecked() or both:
@@ -1716,6 +1764,10 @@ class DaqView:
 
         # call this to make sure the proper controls stay disabled
         self.check_calibration()
+
+    ##################
+    # Qt application #
+    ##################
 
     def run(self):
         self._window.show()
