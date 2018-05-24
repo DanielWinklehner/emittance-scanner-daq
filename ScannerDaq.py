@@ -21,7 +21,7 @@ from scipy import interpolate
 
 from PyQt5.QtCore import QObject, QThread, QTimer, pyqtSignal, pyqtSlot
 from PyQt5.QtWidgets import QApplication, QFileDialog, QDialog, \
-                            QPushButton, QLabel, QHBoxLayout
+                            QPushButton, QLabel, QHBoxLayout, QLineEdit
 
 from gui import MainWindow
 
@@ -702,6 +702,7 @@ class DaqView:
 
         # scan buttons
         self._window.ui.btnChooseFile.clicked.connect(self.choose_file)
+        self._window.ui.btnAddField.clicked.connect(self.add_metadata_field)
         self._window.ui.btnStartScan.clicked.connect(self.scan)
         self._window.ui.btnStopScan.clicked.connect(self.stop_scan)
         self._window.ui.rbVScan.toggled.connect(self.on_scan_rb_changed)
@@ -726,6 +727,9 @@ class DaqView:
         self._horcalib = False
         self._vregcalib = False
         self._vreg_layouts = []  # list of Qt layouts created for each calibration point
+
+        # scan variables
+        self._metadata = {}
 
         # device manager class allows devices to be updated independently of the gui thread
         self._dm = DeviceManager()
@@ -994,11 +998,21 @@ class DaqView:
             'vreg': self._dm.devices['vreg']['calibration'],
         }
 
+        metadata_dict = {}
+        for name, info in self._metadata.items():
+            metadata_dict[name] = {
+                'field': name,
+                'value': info['value'],
+                'mandatory': info['mandatory'],
+                'order': info['order']
+            }
+
         save_data = {
             'ui': self._window.session_properties,
             'devices': calibration_dict,
             'vreg': {'min': self._dm.devices['vreg']['min'],
-                     'max': self._dm.devices['vreg']['max']}
+                     'max': self._dm.devices['vreg']['max']},
+            'metadata': metadata_dict,
         }
 
         with open('session.cfg', 'w') as f:
@@ -1021,6 +1035,9 @@ class DaqView:
 
         self._dm.devices['vreg']['min'] = data_dict['vreg']['min']
         self._dm.devices['vreg']['max'] = data_dict['vreg']['max']
+
+        for metadata_name, info in data_dict['metadata'].items():
+            self.add_metadata_field(info)
 
         # this function also calls self.check_calibration()
         self.update_vreg_calibration()
@@ -1111,38 +1128,6 @@ class DaqView:
         self._window.tabScan.setEnabled(False)
         self._window.ui.gbVCalib.setEnabled(False)
         self._window.ui.gbHCalib.setEnabled(False)
-
-    """
-    def set_stepper_calibration(self, stepper, upper, lower):
-        # send command to extend stepper
-        # wait until stepper isnt moving anymore
-        # set first point
-        # send command to retract stepper
-        # set second point
-
-        waittime = 0.1 # TODO maybe this should depend on the polling rate?
-        prefix = 'vmove ' if stepper == 'vstepper' else 'hmove '
-
-        lower_steps = None
-        upper_steps = None
-
-        # extend stepper <=> move in negative direction
-        msg = prefix + 'SL - SP'
-        self._comm.add_message_to_queue(msg)
-        while self._dm.devices[stepper]['flag'] != 'MIN':
-            time.sleep(waittime)
-        lower_steps = self._dm.devices[stepper]['value']
-
-        # retract stepper <=> move in positive direction
-        msg = prefix + 'SL SP'
-        self._comm.add_message_to_queue(msg)
-        while self._dm.devices[stepper]['flag'] != 'MAX':
-            time.sleep(waittime)
-        upper_steps = self._dm.devices[stepper]['value']
-
-        self._dm.devices[stepper]['calibration'] = \
-            [(upper_steps, upper), (lower_steps, lower)]
-    """
 
     def on_calibration_done(self, stepper):
         """ Clean up everything associated with calibration thread
@@ -1251,6 +1236,8 @@ class DaqView:
             clear_layout(layout)
             self._window.ui.gbVolCalib.layout().removeItem(layout)
 
+        self._vreg_layouts = []
+
         # add current set of calibration points
         for i, point in enumerate(self._dm.devices['vreg']['calibration']):
 
@@ -1286,7 +1273,134 @@ class DaqView:
 
             # the start/stop scan button is enabled if the textboxes are valid
             # and the file is set
+            #self.check_scan_valid()
             self.on_scan_rb_changed()
+
+    def add_metadata_field(self, info_dict={}):
+        # if nothing is passed as an argument, create field from gui
+        if not info_dict:
+            field = self._window.ui.txtFieldName.text().strip()
+            if field == '':
+                self._window.ui.lblMetadataError.setText('Invalid field name.')
+                self._window.ui.lblMetadataError.show()
+                return
+            elif field in self._metadata.keys():
+                self._window.ui.lblMetadataError.setText('Field name already exists.')
+                self._window.ui.lblMetadataError.show()
+                return
+
+            # scan won't start unless this field is nonempty
+            mandatory = self._window.ui.chkFieldMandatory.isChecked()
+            order = len(self._metadata.keys())
+            value = ''
+        else:
+            # otherwise create field from the dictionary info
+            field = info_dict['field']
+            value = info_dict['value']
+            mandatory = info_dict['mandatory']
+            order = info_dict['order']
+
+        self._window.ui.lblMetadataError.hide()
+
+        lbl = QLabel('{}:'.format(field))
+        if mandatory:
+            lbl.setStyleSheet('font-weight: bold')
+        txt = QLineEdit()
+        txt.setText(value)
+        txt.textChanged.connect(lambda: self.on_metadata_text_changed(field))
+        btnDel = QPushButton('Delete')
+        btnDel.clicked.connect(lambda: self.delete_metadata(field))
+
+        btnMoveUp = QPushButton('+')
+        btnMoveUp.clicked.connect(lambda: self.move_metadata(field, direction='up'))
+
+        btnMoveDown = QPushButton('-')
+        btnMoveDown.clicked.connect(lambda: self.move_metadata(field, direction='down'))
+
+        # create new control for the gui
+        self._metadata[field] = {
+            'value': value,
+            'order': order,
+            'mandatory': mandatory,
+            'label': lbl,
+            'text': txt,
+            'delete_button': btnDel,
+            'move_up_button': btnMoveUp,
+            'move_down_button': btnMoveDown,
+        }
+
+        self.update_metadata()
+        self.on_scan_rb_changed()
+
+    def on_metadata_text_changed(self, field):
+        self._metadata[field]['value'] = self._metadata[field]['text'].text()
+        self.on_scan_rb_changed() # this checks if the scan is valid
+
+    def update_metadata(self):
+        clear_layout(self._window.ui.layoutMetadata)
+
+        sorted_fields = sorted([(name, info) for name, info in self._metadata.items()],
+            key=lambda x: x[1]['order'])
+
+        # add controls to form
+        for field, info in sorted_fields:
+            self._window.ui.layoutMetadata.addWidget(info['label'], info['order'], 0)
+            self._window.ui.layoutMetadata.addWidget(info['text'], info['order'], 1)
+
+            if info['order'] == 0:
+                info['move_up_button'].setEnabled(False)
+            else:
+                info['move_up_button'].setEnabled(True)
+
+            self._window.ui.layoutMetadata.addWidget(info['move_up_button'], info['order'], 2)
+
+            if info['order'] == sorted_fields[-1][1]['order']:
+                # last index
+                info['move_down_button'].setEnabled(False)
+            else:
+                info['move_down_button'].setEnabled(True)
+
+            self._window.ui.layoutMetadata.addWidget(info['move_down_button'], info['order'], 3)
+
+            self._window.ui.layoutMetadata.addWidget(info['delete_button'], info['order'], 4)
+
+    def move_metadata(self, field_name, direction):
+        old_index = self._metadata[field_name]['order']
+        new_index = old_index - 1 if direction == 'up' else old_index + 1
+
+        shiftleft = False
+        if new_index > old_index:
+            shiftleft = True
+
+        for field, info in self._metadata.items():
+            if shiftleft:
+                # shift all fields between old_index and new_index by -1
+                if info['order'] > old_index and info['order'] <= new_index:
+                    self._metadata[field]['order'] -= 1
+
+            else:
+                # shift all fields between old_index and new_index by +1
+                if info['order'] < old_index and info['order'] >= new_index:
+                    self._metadata[field]['order'] += 1
+
+        self._metadata[field_name]['order'] = new_index
+
+        self.update_metadata()
+
+    def delete_metadata(self, field_name):
+        del self._metadata[field_name]
+
+        # re-set ordering of all fields
+        sorted_fields = sorted([(name, info) for name, info in self._metadata.items()],
+            key=lambda x: x[1]['order'])
+
+        new_index = 0
+        for field_name, info in sorted_fields:
+            self._metadata[field_name]['order'] = new_index
+            new_index += 1
+
+        self.update_metadata()
+        self.on_scan_rb_changed()
 
     def on_scan_textbox_change(self):
         """ Function that calculates the number of scan points """
@@ -1383,14 +1497,26 @@ class DaqView:
                     'Total points: {}'.format(
                         vertical_settings['points'] + horizontal_settings['points']))
 
-            # and if the user has selected a valid file, then they may start a scan
-            if self._scanfile != '':
+            if self.check_scan_valid():
                 self._window.ui.btnStartScan.setEnabled(True)
 
     def stop_scan(self):
         self._comm.clear_queue()
         self._daq.terminate()
         self.stepper_com('\x1b')
+
+    def check_scan_valid(self):
+        # check if we have a file name
+        if self._scanfile == '':
+            return False
+
+        # check if we have filled in all mandatory metadata fields
+        for field_name, info in self._metadata.items():
+            if info['mandatory']:
+                if info['value'] == '':
+                    return False
+
+        return True
 
     def scan(self):
         """ Called when user presses the start scan button. Calculates the
@@ -1476,7 +1602,13 @@ class DaqView:
                    "# {} scan\n" \
                    "# Time initiated: {}\n" \
                    "# Number of points: {}\n" \
-                   "time,pos,v,i,i_rms\n".format(kind, time, str(pts))
+                   "#\n" \
+                   "# User-defined metadata\n".format(kind, time, str(pts))
+
+        for field, info in self._metadata.items():
+            preamble += "# {}: {}\n".format(field, info['value'])
+
+        preamble += "#\ntime,pos,v,i,i_rms\n"
 
         _file = self._scanfile
         if self._window.ui.rbBothScan.isChecked():
