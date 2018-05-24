@@ -252,24 +252,13 @@ class MainWindow(QMainWindow):
         painter.fillRect(0, 0, w, h, gradient)
         self.ui.lblColorScale.setPixmap(self._pxcs)
 
-    def draw_scan_hist(self, data):
-
-        w = float(self.ui.lblScanStatus.width())
-        h = float(self.ui.lblScanStatus.height())
-
+    def make_histogram(self, data, width, height):
+        w = width
+        h = height
         if data is None:
             self._px = QPixmap(int(w), int(h))
             self._px.fill(QColor(255, 255, 255))
-            self.ui.lblScanStatus.setPixmap(self._px)
-            self.ui.lblColorScaleMin.setText('--')
-            self.ui.lblColorScaleMid.setText('--')
-            self.ui.lblColorScaleMax.setText('--')
-            return
-
-        if self.ui.rbVScanStatus.isChecked():
-            self._vdata = data
-        else:
-            self._hdata = data
+            return self._px
 
         self._px = QPixmap(int(w), int(h))
         self._px.fill(QColor(255, 255, 255))
@@ -281,10 +270,6 @@ class MainWindow(QMainWindow):
         max_v = max(data['v'])
         min_current = min(data['i'])[0]
         max_current = max(data['i'])[0]
-
-        self.ui.lblColorScaleMin.setText('{0:.4e}'.format(min_current))
-        self.ui.lblColorScaleMid.setText('{0:.4e}'.format((min_current + max_current) / 2.))
-        self.ui.lblColorScaleMax.setText('{0:.4e}'.format(max_current))
 
         # number of unique position/voltage points
         n_pos_pts = len(np.unique(data['pos']))
@@ -335,7 +320,41 @@ class MainWindow(QMainWindow):
             prev_y = y
 
         # set pixmap onto the label widget
-        self.ui.lblScanStatus.setPixmap(self._px)
+        return self._px
+
+    def draw_scan_hist(self, data):
+
+        w = float(self.ui.lblScanStatus.width())
+        h = float(self.ui.lblScanStatus.height())
+
+        self.ui.lblScanStatus.setPixmap(self.make_histogram(data, w, h))
+
+        if data is None:
+            self.ui.lblColorScaleMin.setText('--')
+            self.ui.lblColorScaleMid.setText('--')
+            self.ui.lblColorScaleMax.setText('--')
+            return
+
+        if self.ui.rbVScanStatus.isChecked():
+            self._vdata = data
+        else:
+            self._hdata = data
+
+        min_pos = min(data['pos'])
+        max_pos = max(data['pos'])
+        min_v = min(data['v'])
+        max_v = max(data['v'])
+        min_current = min(data['i'])[0]
+        max_current = max(data['i'])[0]
+
+        self.ui.lblColorScaleMin.setText('{0:.4e}'.format(min_current))
+        self.ui.lblColorScaleMid.setText('{0:.4e}'.format((min_current + max_current) / 2.))
+        self.ui.lblColorScaleMax.setText('{0:.4e}'.format(max_current))
+
+    @property
+    # currently stored image
+    def px(self):
+        return self._px
 
     # widget aliases
     @property

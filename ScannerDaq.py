@@ -702,6 +702,7 @@ class DaqView:
 
         # scan buttons
         self._window.ui.btnChooseFile.clicked.connect(self.choose_file)
+        self._window.ui.chkSaveImage.toggled.connect(self.on_save_image_checkbox_changed)
         self._window.ui.btnAddField.clicked.connect(self.add_metadata_field)
         self._window.ui.btnStartScan.clicked.connect(self.scan)
         self._window.ui.btnStopScan.clicked.connect(self.stop_scan)
@@ -1276,6 +1277,9 @@ class DaqView:
             #self.check_scan_valid()
             self.on_scan_rb_changed()
 
+    def on_save_image_checkbox_changed(self):
+        self.on_scan_rb_changed()
+
     def add_metadata_field(self, info_dict={}):
         # if nothing is passed as an argument, create field from gui
         if not info_dict:
@@ -1518,6 +1522,42 @@ class DaqView:
 
         return True
 
+    def on_scan_rb_changed(self):
+        """ Update the total number of points when user changes scan selection """
+        self.on_scan_textbox_change()
+
+        text = ''
+
+        if self._scanfile == '':
+            return
+
+        _fname = self._scanfile[:-4]
+
+        if self._window.ui.rbBothScan.isChecked():
+            text = 'Saving output to:\n{0}_v.csv\n{0}_h.csv'.format(_fname)
+            if self._window.ui.chkSaveImage.isChecked():
+                text += '\nSaving images to:\n{0}_v.png\n{0}_h.png'.format(_fname)
+
+        else:
+            text = 'Saving output to:\n{}'.format(self._scanfile)
+            if self._window.ui.chkSaveImage.isChecked():
+                text += '\nSaving an image to:\n{}.png'.format(_fname)
+
+        self._window.ui.lblSaveFile.setText(text)
+
+    def on_scan_status_rb_changed(self):
+        """ Update the plot when the user switches views """
+        if self._window.ui.rbVScanStatus.isChecked():
+            try:
+                self._window.draw_scan_hist(self._daq.vdata)
+            except AttributeError:
+                self._window.draw_scan_hist(None)
+        else:
+            try:
+                self._window.draw_scan_hist(self._daq.hdata)
+            except AttributeError:
+                self._window.draw_scan_hist(None)
+
     def scan(self):
         """ Called when user presses the start scan button. Calculates the
             points to scan from the textboxes, and creates a Daq object
@@ -1560,31 +1600,6 @@ class DaqView:
         self._window.enable_scan_controls(False)
         self._window.ui.gbVCalib.setEnabled(False)
         self._window.ui.gbHCalib.setEnabled(False)
-
-    def on_scan_rb_changed(self):
-        """ Update the total number of points when user changes scan selection """
-        self.on_scan_textbox_change()
-
-        if self._window.ui.rbBothScan.isChecked():
-            if self._scanfile != '':
-                _fname = self._scanfile[:-4]
-                self._window.ui.lblSaveFile.setText('Saving output to:\n{}_v.csv\n{}_h.csv'.format(_fname, _fname))
-        else:
-            if self._scanfile != '':
-                self._window.ui.lblSaveFile.setText('Saving output to:\n{}'.format(self._scanfile))
-
-    def on_scan_status_rb_changed(self):
-        """ Update the plot when the user switches views """
-        if self._window.ui.rbVScanStatus.isChecked():
-            try:
-                self._window.draw_scan_hist(self._daq.vdata)
-            except AttributeError:
-                self._window.draw_scan_hist(None)
-        else:
-            try:
-                self._window.draw_scan_hist(self._daq.hdata)
-            except AttributeError:
-                self._window.draw_scan_hist(None)
 
     def on_scan_start(self, time, kind):
         # create file preamble
@@ -1651,6 +1666,26 @@ class DaqView:
         self._window.ui.lblScanProgress.setText('Current point: {}/{} ({:.0%})'.format(
             self._daq.current_point_count, self._daq.total_points,
             self._daq.current_point_count / self._daq._total_points))
+
+        if self._daq.current_point_count == self._daq.total_points and self._window.ui.chkSaveImage.isChecked():
+            self.save_scan_image()
+
+    def save_scan_image(self):
+        both = self._window.ui.rbBothScan.isChecked()
+
+        if self._window.ui.rbVScan.isChecked() or both:
+            img = self._window.make_histogram(self._daq.vdata, 500, 500)
+            _file = self._scanfile[:-4]
+            if both:
+                _file += '_v'
+            self._window.px.save(_file + '.png', 'png')
+
+        if self._window.ui.rbHScan.isChecked() or both:
+            img = self._window.make_histogram(self._daq.hdata, 500, 500)
+            _file = self._scanfile[:-4]
+            if both:
+                _file += '_h'
+            self._window.px.save(_file + '.png', 'png')
 
     def on_one_scan_finished(self, final):
         """ Function called after first scan (vertical) is finished.

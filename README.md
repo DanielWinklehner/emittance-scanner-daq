@@ -33,5 +33,5 @@ Server and GUI for operating the MIST-1 emittance scanners
     - (Done) ~~Fill in scan status labels & estimate time remaining~~
     - Automatically repeat calibration at user-specified intervals
     - Save previous scans to the review tab
-    - Save an image of the scan when the scan completes
+    - (Done) ~~Save an image of the scan when the scan completes~~
     - (Done) ~~User-editable metadata fields~~
