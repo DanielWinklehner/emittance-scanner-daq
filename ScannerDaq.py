@@ -13,6 +13,7 @@ import timeit
 import queue
 import threading
 import json
+import copy
 from collections import deque
 
 import numpy as np
@@ -21,9 +22,11 @@ from scipy import interpolate
 
 from PyQt5.QtCore import QObject, QThread, QTimer, pyqtSignal, pyqtSlot
 from PyQt5.QtWidgets import QApplication, QFileDialog, QDialog, \
-                            QPushButton, QLabel, QHBoxLayout, QLineEdit
+                            QPushButton, QLabel, QHBoxLayout, QLineEdit, \
+                            QSizePolicy, QVBoxLayout, QFrame
 
 from gui import MainWindow
+from components.scan import Scan
 
 
 def arange_inclusive(start, stop, step, decimals=6):
@@ -143,7 +146,7 @@ class Daq(QObject):
     """ Class for collecting and organizing data from scans """
     sig_msg = pyqtSignal(str) # emit when ready to send command to server
     sig_new_pt = pyqtSignal(object, str) # emit when the scan completes a new point, string tells which type of scan
-    sig_scan_started = pyqtSignal(str, str) # emits timestamps when scan starts
+    sig_scan_started = pyqtSignal(dt.datetime, str) # emits timestamps when scan starts
     sig_scan_finished = pyqtSignal(bool) # emits true if done, or false if there is still a horizontal scan to do
     sig_done = pyqtSignal() # emit when all scans have completed
 
@@ -159,53 +162,36 @@ class Daq(QObject):
         self._vdata = None
         self._hdata = None
 
-        if self._devices['vstepper']['scan'][0] is not None:
-            self._v_scan_pts = [self._devices['vstepper']['scan'][0],
-                                self._devices['vreg']['scan'][0]]
+        for stepper in ['vstepper', 'hstepper']:
+            if self._devices[stepper]['scan'][0] is not None:
+                scan_pts = [self._devices[stepper]['scan'][0],
+                    self._devices['vreg']['scan'][0 if stepper == 'vstepper' else 1]
+                ]
+                data = np.empty(shape=(len(scan_pts[0]) * \
+                                        len(scan_pts[1]), 1),
+                                dtype=[('time', object),
+                                       ('pos', object),
+                                       ('v', object),
+                                       ('i', object),
+                                       ('i_rms', object)]
+                       )
 
-            # creates empty array with n rows and (time, pos, v, i) columns
-            # n = # of vstepper points * # of vreg points
-            self._vdata = np.empty(shape=(len(self._v_scan_pts[0]) * \
-                                            len(self._v_scan_pts[1]), 1),
-                                    dtype=[('time', object),
-                                           ('pos', object),
-                                           ('v', object),
-                                           ('i', object),
-                                           ('i_rms', object)]
-                                    )
+                vsteps = len(scan_pts[1])
+                for i, step_target in enumerate(scan_pts[0]):
+                    for j, targetv in enumerate(scan_pts[1]):
+                        data[i * vsteps + j]['pos'] = calibrate(step_target, self._devices[stepper])
+                        # convert set vals -> kV instead of read vals -> kV, so use alt flag
+                        data[i * vsteps + j]['v'] = calibrate(targetv, self._devices['vreg'], alt=True)
 
-            vsteps = len(self._v_scan_pts[1])
-            for i, vtarget in enumerate(self._v_scan_pts[0]):
-                for j, vtargetv in enumerate(self._v_scan_pts[1]):
-                    self._vdata[i * vsteps + j]['pos'] = calibrate(vtarget, self._devices['vstepper'])
-                    # convert set vals -> kV instead of read vals -> kV, so use alt flag
-                    self._vdata[i * vsteps + j]['v'] = calibrate(vtargetv, self._devices['vreg'], alt=True)
+                # initialize currents to nan so that the gui can draw null bins on 2d histogram
+                data['i'] = np.nan
 
-            # initialize currents to nan so that the gui can draw null bins on 2d histogram
-            self._vdata['i'] = np.nan
-
-        # repeat above block for hstepper
-        if self._devices['hstepper']['scan'][0] is not None:
-            self._h_scan_pts = [self._devices['hstepper']['scan'][0],
-                                self._devices['vreg']['scan'][1]]
-
-            self._hdata = np.empty(shape=(len(self._h_scan_pts[0]) * \
-                                            len(self._h_scan_pts[1]), 1),
-                                    dtype=[('time', object),
-                                           ('pos', object),
-                                           ('v', object),
-                                           ('i', object),
-                                           ('i_rms', object)]
-                                    )
-
-            hsteps = len(self._h_scan_pts[1])
-            for i, htarget in enumerate(self._h_scan_pts[0]):
-                for j, htargetv in enumerate(self._h_scan_pts[1]):
-                    self._hdata[i * hsteps + j]['pos'] = calibrate(htarget, self._devices['hstepper'])
-                    self._hdata[i * hsteps + j]['v'] = calibrate(htargetv, self._devices['vreg'], alt=True)
-
-            # initialize currents to nan so that the gui can draw null bins on 2d histogram
-            self._hdata['i'] = np.nan
+                if stepper == 'vstepper':
+                    self._v_scan_pts = scan_pts
+                    self._vdata = data
+                else:
+                    self._h_scan_pts = scan_pts
+                    self._hdata = data
 
         self._terminate = False
 
@@ -284,7 +270,8 @@ class Daq(QObject):
 
         time.sleep(1)
 
-        timestamp = dt.datetime.strftime(dt.datetime.now(), '%Y-%m-%d %H:%M:%S')
+        #timestamp = dt.datetime.strftime(dt.datetime.now(), '%Y-%m-%d %H:%M:%S')
+        timestamp = dt.datetime.now()
         kind = 'Vertical' if stepper == 'vstepper' else 'Horizontal'
         self.sig_scan_started.emit(timestamp, kind)
 
@@ -721,7 +708,7 @@ class DaqView:
         for txt in txtlist:
             eval('self._window.ui.{}.textChanged.connect(self.on_scan_textbox_change)'.format(txt))
 
-        self._window.ui.rbVScanStatus.toggled.connect(self.on_scan_status_rb_changed)
+        #self._window.ui.rbVScanStatus.toggled.connect(self.on_scan_status_rb_changed)
 
         # calibration variables
         self._vercalib = False
@@ -731,6 +718,8 @@ class DaqView:
 
         # scan variables
         self._metadata = {}
+        self._current_scan = None
+        self._past_scans = []
 
         # device manager class allows devices to be updated independently of the gui thread
         self._dm = DeviceManager()
@@ -900,7 +889,8 @@ class DaqView:
                             info['status'] != '' else ''
                     )
                 )
-                self._window.update_plot(device_name, info['deque'])
+                if self._window.ui.chkUpdatePlots.isChecked():
+                    self._window.update_plot(device_name, info['deque'])
 
         app.processEvents()
 
@@ -1591,19 +1581,6 @@ class DaqView:
         self._window.ui.lblScanError.hide()
         self._window.ui.btnStartScan.setEnabled(True)
 
-    def on_scan_status_rb_changed(self):
-        """ Update the plot when the user switches views """
-        if self._window.ui.rbVScanStatus.isChecked():
-            try:
-                self._window.draw_scan_hist(self._daq.vdata)
-            except AttributeError:
-                self._window.draw_scan_hist(None)
-        else:
-            try:
-                self._window.draw_scan_hist(self._daq.hdata)
-            except AttributeError:
-                self._window.draw_scan_hist(None)
-
     # -----------------------
     # Actually doing the scan
     # -----------------------
@@ -1658,47 +1635,37 @@ class DaqView:
 
     def on_scan_start(self, time, kind):
         # create file preamble
+        stepper = ''
         if kind == 'Vertical':
-            pts = len(self._dm.devices['vstepper']['scan'][0]) * \
-                        len(self._dm.devices['vreg']['scan'][0])
-
+            stepper = 'vstepper'
             # since we are here, switch the user view to the vertical status page
             self._window.ui.rbVScanStatus.setChecked(True)
         else:
-            pts = len(self._dm.devices['hstepper']['scan'][0]) * \
-                        len(self._dm.devices['vreg']['scan'][1])
-
-        preamble = "# Emittance scan results\n" \
-                   "# {} scan\n" \
-                   "# Time initiated: {}\n" \
-                   "# Number of points: {}\n" \
-                   "#\n" \
-                   "# User-defined metadata\n".format(kind, time, str(pts))
-
-        for field, info in self._metadata.items():
-            preamble += "# {}: {}\n".format(field, info['value'])
-
-        preamble += "#\ntime,pos,v,i,i_rms\n"
+            stepper = 'hstepper'
 
         _file = self._scanfile
         if self._window.ui.rbBothScan.isChecked():
-            # if we are doing 2 scans, then we need file_v.csv and file_h.csv
-            _file = self._scanfile[:-4] + '_{}.csv'.format(kind[0].lower())
+            _file = _file[:-4] + '_{}.csv'.format(kind[0].lower())
 
-        with open(_file, 'w') as f:
-            f.write(preamble)
+        scan_settings = {
+            'file': _file,
+            'time': time,
+            'kind': kind,
+            'stepper_points': self._dm.devices[stepper]['scan'][0],
+            'vreg_points': self._dm.devices['vreg']['scan'][0 if kind == 'Vertical' else 1],
+            'metadata': self._metadata,
+            'data': self._daq.vdata if kind == 'Vertical' else self._daq.hdata
+        }
+
+        self._current_scan = Scan(**scan_settings)
+
+        with open(self._current_scan.file, 'w') as f:
+            f.write(self._current_scan.preamble())
 
     def on_scan_pt(self, pt, kind):
         """ update the file and GUI when a new point comes in """
-        if self._window.ui.rbVScanStatus.isChecked():
-            self._window.draw_scan_hist(self._daq.vdata)
-        else:
-            self._window.draw_scan_hist(self._daq.hdata)
-
-        _file = self._scanfile
-        if self._window.ui.rbBothScan.isChecked():
-            # if we are doing 2 scans, then we need file_v.csv and file_h.csv
-            _file = self._scanfile[:-4] + '_{}.csv'.format(kind[0].lower())
+        self._window.draw_scan_hist(self._current_scan, kind)
+        _file = self._current_scan.file
 
         # append data to text file
         with open(_file, 'a') as f:
@@ -1722,22 +1689,19 @@ class DaqView:
             self._daq.current_point_count, self._daq.total_points,
             self._daq.current_point_count / self._daq._total_points))
 
-        if self._daq.current_point_count == self._daq.total_points and self._window.ui.chkSaveImage.isChecked():
-            self.save_scan_image()
-
     def save_scan_image(self):
         """ Draw a 2D histogram of scan data as a QPixmap and save the output """
         both = self._window.ui.rbBothScan.isChecked()
 
         if self._window.ui.rbVScan.isChecked() or both:
-            img = self._window.make_histogram(self._daq.vdata, 500, 500)
+            img = self._current_scan.make_histogram(500, 500)
             _file = self._scanfile[:-4]
             if both:
                 _file += '_v'
             self._window.px.save(_file + '.png', 'png')
 
         if self._window.ui.rbHScan.isChecked() or both:
-            img = self._window.make_histogram(self._daq.hdata, 500, 500)
+            img = self._current_scan.make_histogram(500, 500)
             _file = self._scanfile[:-4]
             if both:
                 _file += '_h'
@@ -1749,12 +1713,46 @@ class DaqView:
         """
         if not final:
             self._window.ui.rbHScanStatus.setChecked(True)
+            # transfer finished scan array to the scan object
+            self._current_scan.data = copy.deepcopy(self._daq._vdata)
+            self._past_scans.append(self._current_scan)
+            self.update_past_scans()
+
+            # and save an image if requested by the user
+            if self._window.ui.chkSaveImage.isChecked():
+                img = self._current_scan.make_histogram(500, 500)
+                _file = self._scanfile[:-4]
+                if self._window.ui.rbBothScan.isChecked():
+                    _file += '_v'
+                img.save(_file + '.png', 'png')
 
     def on_scan_finished(self):
         """ Clean up after scan, and tell the thread to quit
             This function is called when the stepper has returned to
             its original position.
         """
+
+        # copy data to current scan object before deleteing the daq object
+        # which holds the memory reference
+        if self._daq.current_scan_direction == 'Vertical':
+            # scan finished with only doing a vertical scan
+            self._current_scan.data = copy.deepcopy(self._daq._vdata)
+        else:
+            # scan finished with horizontal scan. If 'both' scan
+            # was selected, then vertical data was copied in
+            # on_one_scan_finished
+            self._current_scan.data = copy.deepcopy(self._daq._hdata)
+
+        self._past_scans.append(self._current_scan)
+        self.update_past_scans()
+
+        if self._window.ui.chkSaveImage.isChecked():
+            img = self._current_scan.make_histogram(500, 500)
+            _file = self._scanfile[:-4]
+            if self._window.ui.rbBothScan.isChecked():
+                _file += '_v' if self._daq.current_scan_direction == 'Vertical' else '_h'
+            img.save(_file + '.png', 'png')
+
         self._daq.deleteLater()
         self._scan_thread.quit()
         self._scan_thread.wait()
@@ -1772,6 +1770,41 @@ class DaqView:
 
         # call this to make sure the proper controls stay disabled
         self.check_calibration()
+
+        print(self._past_scans)
+
+    ###############
+    # Review page #
+    ###############
+
+    def update_past_scans(self):
+        clear_layout(self._window.ui.fmPastScans.layout())
+
+        for scan in self._past_scans:
+            # create widget to hold scan info
+            fm = QFrame()
+            ly = QVBoxLayout()
+            fm.setLayout(ly)
+
+            title = QLabel(scan.kind)
+            ly.addWidget(title)
+
+            img = QLabel()
+            img.resize(100, 100)
+            img.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+            img.setPixmap(scan.make_histogram(100, 100))
+
+            ly.addWidget(img)
+
+            lbl = QLabel('{}'.format(scan.time_string('%Y/%m/%d\n%H:%M %p')))
+            ly.addWidget(lbl)
+
+            btn = QPushButton('Review')
+            ly.addWidget(btn)
+
+            self._window.ui.fmPastScans.layout().addWidget(fm)
+
+        self._window.ui.fmPastScans.layout().addStretch()
 
     ##################
     # Qt application #

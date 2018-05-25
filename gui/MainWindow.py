@@ -10,6 +10,23 @@ from matplotlib import cm
 import numpy as np
 import pyqtgraph as pg
 
+# global lists of controls because saving and loading use them
+textboxes = [
+    'txtVCalibUpper', 'txtVCalibLower', 'txtHCalibUpper', 'txtHCalibLower',
+    'txtVMinPos', 'txtVMaxPos', 'txtVStepPos', 'txtVMinV', 'txtVMaxV', 'txtVStepV',
+    'txtHMinPos', 'txtHMaxPos', 'txtHStepPos', 'txtHMinV', 'txtHMaxV', 'txtHStepV',
+    'txtIP', 'txtPort', 'txtScanComDelay', 'txtVregMin', 'txtVregMax'
+]
+
+radiobuttons = [
+    'rbVCalib', 'rbHCalib', 'rbVScanStatus', 'rbHScanStatus',
+    'rbVScan', 'rbBothScan', 'rbHScan'
+]
+
+checkboxes = [
+    'chkDanger', 'chkSaveImage', 'chkFieldMandatory', 'chkUpdatePlots'
+]
+
 
 class MainWindow(QMainWindow):
 
@@ -26,6 +43,7 @@ class MainWindow(QMainWindow):
         self.ui.chkDanger.toggled.connect(lambda chk: self.ui.gbDanger.setEnabled(chk))
         self.ui.rbVCalib.toggled.connect(self.on_calib_rb_changed)
         self.ui.rbVScan.toggled.connect(self.on_scan_rb_changed)
+        self.ui.rbVScanStatus.toggled.connect(self.on_scan_status_rb_changed)
         self.ui.rbBothScan.toggled.connect(self.on_scan_rb_changed)
 
         self.ui.lblServerMsg.hide()
@@ -50,9 +68,9 @@ class MainWindow(QMainWindow):
         self.ui.lblColorScale.resizeEvent = self.on_scan_hist_resize
         self._scan_color_scale = cm.viridis
 
-        # local copy of data arrays to plot
-        self._hdata = None
-        self._vdata = None
+        # local copy of scan to plot
+        self._current_v_scan = None
+        self._current_h_scan = None
 
         # monitoring plots
         self._vstepper_plot = DateTimePlotWidget()
@@ -129,15 +147,14 @@ class MainWindow(QMainWindow):
         self.ui.splitScanInfo.setSizes([settings['split-scaninfo-first'],
                                         settings['split-scaninfo-second']])
 
-        textboxes = [
-            'txtVCalibUpper', 'txtVCalibLower', 'txtHCalibUpper', 'txtHCalibLower',
-            'txtVMinPos', 'txtVMaxPos', 'txtVStepPos', 'txtVMinV', 'txtVMaxV', 'txtVStepV',
-            'txtHMinPos', 'txtHMaxPos', 'txtHStepPos', 'txtHMinV', 'txtHMaxV', 'txtHStepV',
-            'txtIP', 'txtPort', 'txtScanComDelay', 'txtVregMin', 'txtVregMax'
-         ]
-
         for txt in textboxes:
             eval('self.ui.{}.setText("{}")'.format(txt, settings[txt]))
+
+        for rb in radiobuttons:
+            eval('self.ui.{}.setChecked({})'.format(rb, settings[rb]))
+
+        for chk in checkboxes:
+            eval('self.ui.{}.setChecked({})'.format(chk, settings[chk]))
 
     @property
     def session_properties(self):
@@ -152,15 +169,14 @@ class MainWindow(QMainWindow):
             'window-height': self.frameSize().height(),
         }
 
-        textboxes = [
-            'txtVCalibUpper', 'txtVCalibLower', 'txtHCalibUpper', 'txtHCalibLower',
-            'txtVMinPos', 'txtVMaxPos', 'txtVStepPos', 'txtVMinV', 'txtVMaxV', 'txtVStepV',
-            'txtHMinPos', 'txtHMaxPos', 'txtHStepPos', 'txtHMinV', 'txtHMaxV', 'txtHStepV',
-            'txtIP', 'txtPort', 'txtScanComDelay', 'txtVregMin', 'txtVregMax'
-        ]
-
         for txt in textboxes:
             settings[txt] = eval('self.ui.{}.text()'.format(txt))
+
+        for rb in radiobuttons:
+            settings[rb] = eval('self.ui.{}.isChecked()'.format(rb))
+
+        for chk in checkboxes:
+            settings[chk] = eval('self.ui.{}.isChecked()'.format(chk))
 
         return settings
 
@@ -227,16 +243,22 @@ class MainWindow(QMainWindow):
             self.ui.rbVScanStatus.setEnabled(False)
             self.ui.rbHScanStatus.setEnabled(True)
 
-    def on_scan_hist_resize(self, event=None):
+    def on_scan_status_rb_changed(self):
         if self.ui.rbVScanStatus.isChecked():
-            self.draw_scan_hist(self._vdata)
+            self.draw_scan_hist(self._current_v_scan, 'Vertical')
         else:
-            self.draw_scan_hist(self._hdata)
+            self.draw_scan_hist(self._current_h_scan, 'Horizontal')
+
+    def on_scan_hist_resize(self, event=None):
+        # redraw the currently selected scan plot
+        self.on_scan_status_rb_changed()
+
+        # redraw the color scale
         self.draw_scan_color_scale()
 
     def draw_scan_color_scale(self):
         # I have no idea why, but without subtracting 2, this gradient bar
-        # grows every update
+        # grows every update. Maybe something to do with the border
         w = self.ui.lblColorScale.width() - 2
         h = self.ui.lblColorScale.height() - 2
 
@@ -252,100 +274,44 @@ class MainWindow(QMainWindow):
         painter.fillRect(0, 0, w, h, gradient)
         self.ui.lblColorScale.setPixmap(self._pxcs)
 
-    def make_histogram(self, data, width, height):
-        w = width
-        h = height
-        if data is None:
-            self._px = QPixmap(int(w), int(h))
-            self._px.fill(QColor(255, 255, 255))
-            return self._px
-
-        self._px = QPixmap(int(w), int(h))
-        self._px.fill(QColor(255, 255, 255))
-        painter = QPainter(self._px)
-
-        min_pos = min(data['pos'])
-        max_pos = max(data['pos'])
-        min_v = min(data['v'])
-        max_v = max(data['v'])
-        min_current = min(data['i'])[0]
-        max_current = max(data['i'])[0]
-
-        # number of unique position/voltage points
-        n_pos_pts = len(np.unique(data['pos']))
-        n_v_pts = len(np.unique(data['v']))
-
-        rect_width = int(w / n_pos_pts)
-        rect_height = int(h / n_v_pts)
-
-        # add 1 px to some rectangles to fill in gaps due to rounding
-        prev_x = 0
-        prev_y = 0
-
-        for i in range(len(data)):
-            perc_pos = 0
-            if min_pos != max_pos:
-                # avoid divide by zero error if only one position point
-                perc_pos = (data[i]['pos'] - min_pos) / (max_pos - min_pos)
-
-            perc_v = 0
-            if max_v != min_v:
-                perc_v = (data[i]['v'] - min_v) / (max_v - min_v)
-
-            if not np.isnan(data[i]['i'][0]):
-                perc_current = 0
-                if max_current != min_current:
-                    perc_current = (data[i]['i'] - min_current) / (max_current - min_current)
-                r, g, b, _ = (int(255 * q) for q in self._scan_color_scale(int(perc_current * 255)))
-                brush = QBrush(QColor(r, g, b))
-            else:
-                brush = QBrush(QColor(22,22,22))
-
-            x = int(perc_pos * (w - rect_width))
-            y = int((1.0 - perc_v) * (h - rect_height))
-
-            height_fix = 0
-            width_fix = 0
-            x_fix = 0
-            if prev_y - rect_height != y:
-                height_fix = abs(y - (prev_y - rect_height))
-
-            if prev_x + rect_width != x:
-                width_fix = 2
-                x_fix = -1
-
-            painter.fillRect(x + x_fix, y, rect_width + width_fix, rect_height + height_fix, brush)
-
-            prev_x = x
-            prev_y = y
-
-        # set pixmap onto the label widget
-        return self._px
-
-    def draw_scan_hist(self, data):
-
+    def draw_scan_hist(self, scan, kind):
+        """ Draw the scan's 2d histogram in the form window and update the
+            z-range labels.
+        """
         w = float(self.ui.lblScanStatus.width())
         h = float(self.ui.lblScanStatus.height())
 
-        self.ui.lblScanStatus.setPixmap(self.make_histogram(data, w, h))
-
-        if data is None:
+        if scan is None:
+            px = QPixmap(int(w), int(h))
+            px.fill(QColor(255, 255, 255))
+            self.ui.lblScanStatus.setPixmap(px)
             self.ui.lblColorScaleMin.setText('--')
             self.ui.lblColorScaleMid.setText('--')
             self.ui.lblColorScaleMax.setText('--')
             return
 
-        if self.ui.rbVScanStatus.isChecked():
-            self._vdata = data
+        # I don't like setting the variables here, but it's convenient since
+        # we pass the scan object anyway
+        if kind == 'Vertical':
+            self._current_v_scan = scan
         else:
-            self._hdata = data
+            self._current_h_scan = scan
 
-        min_pos = min(data['pos'])
-        max_pos = max(data['pos'])
-        min_v = min(data['v'])
-        max_v = max(data['v'])
-        min_current = min(data['i'])[0]
-        max_current = max(data['i'])[0]
+        # don't update the drawing if the user if viewing the other scan
+        if self.ui.rbVScanStatus.isChecked() and kind == 'Horizontal':
+            return
+
+        if self.ui.rbHScanStatus.isChecked() and kind == 'Vertical':
+            return
+
+        self.ui.lblScanStatus.setPixmap(scan.make_histogram(w, h))
+
+        min_pos = min(scan.data['pos'])
+        max_pos = max(scan.data['pos'])
+        min_v = min(scan.data['v'])
+        max_v = max(scan.data['v'])
+        min_current = min(scan.data['i'])[0]
+        max_current = max(scan.data['i'])[0]
 
         self.ui.lblColorScaleMin.setText('{0:.4e}'.format(min_current))
         self.ui.lblColorScaleMid.setText('{0:.4e}'.format((min_current + max_current) / 2.))
