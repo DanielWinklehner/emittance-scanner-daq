@@ -44,4 +44,4 @@ Server and GUI for operating the MIST-1 emittance scanners
         2. The calibrator and daq objects follow the same design principle: Make a QObject, move it to a thread, run the object's method to completion, then safely delete the object and thread before allowing the user to create another instance. This could be encapsulated somehow.
         3. A bit hard to add features to the 2D histogram, like axis ticks and labels. Ideally refactor this code to its own class.
     - Devices are currently dictionaries. They all only use the global calibrate function, and this works well. However, they may need their own functions at some point, so maybe it would be wise to refactor the device dictionaries into classes.
-    - Review page calculate what the scan settings were. Ideally these would just be saved with the scan object to avoid any problems.
+    - (Done) ~~Review page calculate what the scan settings were. Ideally these would just be saved with the scan object to avoid any problems.~~

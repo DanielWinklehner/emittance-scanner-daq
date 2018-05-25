@@ -10,7 +10,7 @@ COMMENT_CHAR = '#'
 
 class Scan(object):
     """ Container for storing scan data & metadata """
-    def __init__(self, file, time, kind, stepper_points, vreg_points, data, metadata, has_image):
+    def __init__(self, file, time, kind, stepper_points, vreg_points, data, metadata, settings):
         self._file = file
         self._time = time
         self._kind = kind
@@ -18,7 +18,9 @@ class Scan(object):
         self._vreg_points = vreg_points
         self._metadata = metadata
         self._data = data
-        self._image_saved = has_image
+        self._settings = settings
+
+        self._title = 'My Scan'
 
         self._color_scale = cm.viridis
         self._histogram = None
@@ -27,12 +29,13 @@ class Scan(object):
         pts = len(self._stepper_points) * len(self._vreg_points)
 
         preamble = ('{0} Emittance scan results\n'
-                   '{0} {1} scan\n'
-                   '{0} Time initiated: {2}\n'
-                   '{0} Number of points: {3}\n'
+                   '{0} {1}\n'
+                   '{0} {2} scan\n'
+                   '{0} Time initiated: {3}\n'
+                   '{0} Number of points: {4}\n'
                    '{0}\n'
                    '{0} User-defined metadata\n'
-                   ).format(COMMENT_CHAR, self._kind, self._time, str(pts))
+                   ).format(COMMENT_CHAR, self._title, self._kind, self._time, str(pts))
 
         for field, info in self._metadata.items():
             preamble += "{} {}: {}\n".format(COMMENT_CHAR, field, info['value'])
@@ -139,5 +142,13 @@ class Scan(object):
         return self._metadata
 
     @property
-    def image_saved(self):
-        return self._image_saved
+    def settings(self):
+        return self._settings
+
+    @property
+    def title(self):
+        return self._title
+
+    @title.setter
+    def title(self, new_title):
+        self._title = new_title

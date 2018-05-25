@@ -1647,18 +1647,41 @@ class DaqView:
         if self._window.ui.rbBothScan.isChecked():
             _file = _file[:-4] + '_{}.csv'.format(kind[0].lower())
 
-        scan_settings = {
+        gui_controls = [
+            'chkSaveImage', 'rbVScan', 'rbHScan', 'rbBothScan',
+            'txtVMinPos', 'txtVMaxPos', 'txtVStepPos',
+            'txtVMinV', 'txtVMaxV', 'txtVStepV',
+            'txtHMinPos', 'txtHMaxPos', 'txtHStepPos',
+            'txtHMinV', 'txtHMaxV', 'txtHStepV',
+        ]
+        scan_settings = {}
+        for control in gui_controls:
+            method = 'text()' if control[:3] == 'txt' else 'isChecked()'
+            scan_settings[control] = eval('self._window.ui.{}.{}'.format(control, method))
+
+        # only save the minimum info to recreate metadata
+        # self._metadata contains controls & bindings that we don't want to copy
+        metadata_dict = {}
+        for field, info in self._metadata.items():
+            metadata_dict[field] = {
+                'field': field,
+                'value': info['value'],
+                'mandatory': info['mandatory'],
+                'order': info['order']
+            }
+
+        scan_parameters = {
             'file': _file,
             'time': time,
             'kind': kind,
             'stepper_points': self._dm.devices[stepper]['scan'][0],
             'vreg_points': self._dm.devices['vreg']['scan'][0 if kind == 'Vertical' else 1],
-            'metadata': self._metadata,
+            'metadata': metadata_dict,
             'data': self._daq.vdata if kind == 'Vertical' else self._daq.hdata,
-            'has_image': self._window.ui.chkSaveImage.isChecked()
+            'settings': scan_settings
         }
 
-        self._current_scan = Scan(**scan_settings)
+        self._current_scan = Scan(**scan_parameters)
 
         with open(self._current_scan.file, 'w') as f:
             f.write(self._current_scan.preamble())
@@ -1808,7 +1831,16 @@ class DaqView:
 
     def show_scan_review_dialog(self, scan):
         dlg = ScanReviewDialog.ScanReviewDialog(scan)
-        accept = dlg.exec_()
+        accept, repeat = dlg.exec_()
+        if repeat:
+            for field, info in scan.metadata.items():
+                self.add_metadata_field(info)
+            self.update_metadata()
+
+            for control, value in scan.settings.items():
+                method = 'setText' if control[:3] == 'txt' else 'setChecked'
+                value = '"{}"'.format(value) if control[:3] == 'txt' else value
+                exec('self._window.ui.{}.{}({})'.format(control, method, value))
 
     ##################
     # Qt application #
