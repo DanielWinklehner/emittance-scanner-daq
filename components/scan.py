@@ -10,7 +10,7 @@ COMMENT_CHAR = '#'
 
 class Scan(object):
     """ Container for storing scan data & metadata """
-    def __init__(self, file, time, kind, stepper_points, vreg_points, data, metadata):
+    def __init__(self, file, time, kind, stepper_points, vreg_points, data, metadata, has_image):
         self._file = file
         self._time = time
         self._kind = kind
@@ -18,6 +18,7 @@ class Scan(object):
         self._vreg_points = vreg_points
         self._metadata = metadata
         self._data = data
+        self._image_saved = has_image
 
         self._color_scale = cm.viridis
         self._histogram = None
@@ -132,3 +133,11 @@ class Scan(object):
     @property
     def kind(self):
         return self._kind
+
+    @property
+    def metadata(self):
+        return self._metadata
+
+    @property
+    def image_saved(self):
+        return self._image_saved

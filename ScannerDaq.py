@@ -25,7 +25,7 @@ from PyQt5.QtWidgets import QApplication, QFileDialog, QDialog, \
                             QPushButton, QLabel, QHBoxLayout, QLineEdit, \
                             QSizePolicy, QVBoxLayout, QFrame
 
-from gui import MainWindow
+from gui import MainWindow, ScanReviewDialog
 from components.scan import Scan
 
 
@@ -1654,7 +1654,8 @@ class DaqView:
             'stepper_points': self._dm.devices[stepper]['scan'][0],
             'vreg_points': self._dm.devices['vreg']['scan'][0 if kind == 'Vertical' else 1],
             'metadata': self._metadata,
-            'data': self._daq.vdata if kind == 'Vertical' else self._daq.hdata
+            'data': self._daq.vdata if kind == 'Vertical' else self._daq.hdata,
+            'has_image': self._window.ui.chkSaveImage.isChecked()
         }
 
         self._current_scan = Scan(**scan_settings)
@@ -1771,8 +1772,6 @@ class DaqView:
         # call this to make sure the proper controls stay disabled
         self.check_calibration()
 
-        print(self._past_scans)
-
     ###############
     # Review page #
     ###############
@@ -1800,11 +1799,16 @@ class DaqView:
             ly.addWidget(lbl)
 
             btn = QPushButton('Review')
+            btn.clicked.connect(lambda: self.show_scan_review_dialog(scan))
             ly.addWidget(btn)
 
             self._window.ui.fmPastScans.layout().addWidget(fm)
 
         self._window.ui.fmPastScans.layout().addStretch()
+
+    def show_scan_review_dialog(self, scan):
+        dlg = ScanReviewDialog.ScanReviewDialog(scan)
+        accept = dlg.exec_()
 
     ##################
     # Qt application #
