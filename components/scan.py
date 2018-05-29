@@ -29,13 +29,13 @@ class Scan(object):
         pts = len(self._stepper_points) * len(self._vreg_points)
 
         preamble = ('{0} Emittance scan results\n'
-                   '{0} {1}\n'
-                   '{0} {2} scan\n'
-                   '{0} Time initiated: {3}\n'
-                   '{0} Number of points: {4}\n'
-                   '{0}\n'
-                   '{0} User-defined metadata\n'
-                   ).format(COMMENT_CHAR, self._title, self._kind, self._time, str(pts))
+                    '{0} {1}\n'
+                    '{0} {2} scan\n'
+                    '{0} Time initiated: {3}\n'
+                    '{0} Number of points: {4}\n'
+                    '{0}\n'
+                    '{0} User-defined metadata\n').format(
+                    COMMENT_CHAR, self._title, self._kind, self._time, str(pts))
 
         for field, info in self._metadata.items():
             preamble += "{} {}: {}\n".format(COMMENT_CHAR, field, info['value'])

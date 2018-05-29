@@ -1606,6 +1606,8 @@ class DaqView:
         except:
             pass
 
+        self._window.clear_scans()
+
         # create a new thead & daq instance
         self._scan_thread = QThread()
         self._daq = Daq(self._dm.devices, com_wait=com_delay)

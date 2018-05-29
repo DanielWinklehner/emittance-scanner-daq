@@ -1,6 +1,7 @@
 from PyQt5.QtWidgets import QLabel, QLineEdit, QDialog
 
 from .ui_ScanReviewDialog import Ui_dlgScanView
+from .widgets.ScanViewWidget import ScanViewWidget
 
 import numpy as np
 
@@ -11,8 +12,6 @@ class ScanReviewDialog(QDialog):
         self.ui.setupUi(self)
 
         self._scan = scan
-
-        print(self._scan.metadata)
 
         self._accepted = False
         self._repeat = False
@@ -34,6 +33,10 @@ class ScanReviewDialog(QDialog):
         self._metadata_controls[field] = txt
 
     def initialize(self):
+        # scan view widget
+        svw = ScanViewWidget(self._scan)
+        self.ui.verticalLayout_2.insertWidget(0, svw)
+
         # title editing
         self.ui.lblScanTitle.setText(self._scan.title)
         self.ui.txtEditTitle.setParent(None)
@@ -45,9 +48,9 @@ class ScanReviewDialog(QDialog):
         self.ui.lblScanKind.setText('{} scan'.format(self._scan.kind))
         self.ui.lblScanFile.setText('{} scan'.format(self._scan.file))
 
-        w = self.ui.lblScanImage.width()
-        h = self.ui.lblScanImage.height()
-        self.ui.lblScanImage.setPixmap(self._scan.make_histogram(int(w), int(h)))
+        #w = self.ui.lblScanImage.width()
+        #h = self.ui.lblScanImage.height()
+        #self.ui.lblScanImage.setPixmap(self._scan.make_histogram(int(w), int(h)))
 
         # fill in labels
         chr = 'V' if self._scan.kind == 'Vertical' else 'H'
