@@ -60,6 +60,8 @@ class ScanViewWidget(QWidget):
 
     @scan.setter
     def scan(self, newscan):
+        if newscan != self._scan:
+            self.reset_selected()
         self._scan = newscan
         self.draw_scan_hist()
 
@@ -181,9 +183,15 @@ class ScanViewWidget(QWidget):
 
             painter = QPainter(px)
             pen = QPen(Qt.red)
-            pen.setWidth(3)
+            pen.setWidth(2)
             painter.setPen(pen)
-            painter.drawRect(*self._plot_rects[self._selected_index])
+            # fit highlight rectangle inside painted rectangle
+            highlight_rect = list(self._plot_rects[self._selected_index])
+            highlight_rect[0] += 1
+            highlight_rect[1] += 1
+            highlight_rect[2] -= 2
+            highlight_rect[3] -= 2
+            painter.drawRect(*highlight_rect)
             painter.end()
 
         self._plot_label.setPixmap(px)
@@ -227,3 +235,9 @@ class ScanViewWidget(QWidget):
         if idx != -1:
             self._selected_index = idx
             self.draw_scan_hist()
+
+    def reset_selected(self):
+        """ If the plot is replaced while a selected point is chosen, avoid
+            index out-of-range errors by resetting the variable.
+        """
+        self._selected_index = -1
