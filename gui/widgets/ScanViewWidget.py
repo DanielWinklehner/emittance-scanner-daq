@@ -1,8 +1,8 @@
 from PyQt5.QtWidgets import QLabel, QVBoxLayout, QHBoxLayout, QFrame, \
                             QSizePolicy, QWidget
 from PyQt5.QtGui import QPixmap, QPainter, QBrush, QColor, QLinearGradient, \
-                        QPalette
-from PyQt5.QtCore import Qt
+                        QPalette, QPen
+from PyQt5.QtCore import Qt, QEvent, QObject, pyqtSignal, pyqtSlot
 
 from matplotlib import cm
 
@@ -17,12 +17,28 @@ class QLine(QFrame):
             self.setFrameShape(QFrame.VLine)
         self.setFrameShadow(QFrame.Sunken)
 
+
+class mouseoverEvent(QObject):
+    """ Event filter class to apply mouse events to QLabel """
+    mouseMove = pyqtSignal(int, int)
+
+    def __init__(self, parent):
+        super(mouseoverEvent, self).__init__(parent)
+
+    def eventFilter(self, object, event):
+        if event.type() in [QEvent.MouseMove, QEvent.MouseButtonPress]:
+            self.mouseMove.emit(event.pos().x(), event.pos().y())
+            return True
+
+        return False
+
 class ScanViewWidget(QWidget):
     def __init__(self, scan=None):
         super().__init__()
 
         self._scan = scan
 
+        self._tooltip_label = None
         self._plot_label = None
         self._color_scale_label = None
         self._scale_min_label = None
@@ -31,6 +47,8 @@ class ScanViewWidget(QWidget):
 
         self._pix_color_scale = None
         self._pix_hist = None
+        self._plot_rects = []
+        self._selected_index = -1
 
         self._color_scale = cm.viridis
 
@@ -49,6 +67,7 @@ class ScanViewWidget(QWidget):
         """ Set up the QWidgets """
         # first container is a QHBoxLayout containing the "V" label and the plot surface
         hbox = QHBoxLayout()
+
         lblV = QLabel("V")
         lblV.setAlignment(Qt.AlignTop)
         lblV.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
@@ -56,6 +75,10 @@ class ScanViewWidget(QWidget):
         # Qt will try to rescale the label on each redraw unless we do this
         self._plot_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         self._plot_label.setFrameShape(QFrame.Box)
+
+        self._event_filter = mouseoverEvent(self)
+        self._plot_label.installEventFilter(self._event_filter)
+        self._event_filter.mouseMove.connect(self.on_mouse_move)
 
         hbox.addWidget(lblV)
         hbox.addWidget(self._plot_label)
@@ -88,6 +111,9 @@ class ScanViewWidget(QWidget):
         hbox_scale.addWidget(self._scale_max_label)
 
         # put it all together
+        self._tooltip_label = QLabel('Clicked point: (Position, Voltage, Current)')
+
+        vbox_outer.addWidget(self._tooltip_label)
         vbox_outer.addLayout(vbox_inner)
         vbox_outer.addWidget(ln)
         vbox_outer.addWidget(self._color_scale_label)
@@ -139,7 +165,28 @@ class ScanViewWidget(QWidget):
             self._scale_max_label.setText('--')
             return
 
-        self._plot_label.setPixmap(self._scan.make_histogram(w, h))
+        px, rects = self._scan.make_histogram(w, h)
+        #self._plot_label.setPixmap(px)
+        self._plot_rects = rects
+
+        # if user has clicked a square, also draw a highlight rectangle
+        if self._selected_index != -1:
+            if np.isnan(self._scan.data[self._selected_index]['i'][0]):
+                return
+
+            self._tooltip_label.setText('Clicked point: ({0}, {1}, {2:.4e})'.format(
+                self._scan.data[self._selected_index]['pos'][0],
+                self._scan.data[self._selected_index]['v'][0],
+                self._scan.data[self._selected_index]['i'][0]))
+
+            painter = QPainter(px)
+            pen = QPen(Qt.red)
+            pen.setWidth(3)
+            painter.setPen(pen)
+            painter.drawRect(*self._plot_rects[self._selected_index])
+            painter.end()
+
+        self._plot_label.setPixmap(px)
 
         min_pos = min(self._scan.data['pos'])
         max_pos = max(self._scan.data['pos'])
@@ -151,3 +198,32 @@ class ScanViewWidget(QWidget):
         self._scale_min_label.setText('{0:.4e}'.format(min_current))
         self._scale_mid_label.setText('{0:.4e}'.format((min_current + max_current) / 2.))
         self._scale_max_label.setText('{0:.4e}'.format(max_current))
+
+    def on_mouse_move(self, x, y):
+        """ Convert mouse coordinate position to scan data point index """
+        if self._scan is None:
+            self._tooltip_label.setText('Clicked point: (Position, Voltage, Current)')
+            return
+
+        idx = -1
+        for i, rect in enumerate(self._plot_rects):
+            if x < rect[0]:
+                continue
+
+            # x > rect.x + rect.width
+            if x > rect[0] + rect[2]:
+                continue
+
+            if y < rect[1]:
+                continue
+
+            # y > rect.y + rect.height
+            if y > rect[1] + rect[3]:
+                continue
+
+            idx = i
+            break
+
+        if idx != -1:
+            self._selected_index = idx
+            self.draw_scan_hist()

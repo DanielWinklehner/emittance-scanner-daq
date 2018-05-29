@@ -25,6 +25,9 @@ class Scan(object):
         self._color_scale = cm.viridis
         self._histogram = None
 
+        # coordinates of each box drawn on histogram pixmap
+        self._histogram_rects = []
+
     def preamble(self):
         pts = len(self._stepper_points) * len(self._vreg_points)
 
@@ -45,17 +48,24 @@ class Scan(object):
         return preamble
 
     def make_histogram(self, width=500, height=500):
-        """ Draw an image (2d histogram) of this scan's data to a QPixmap """
+        """ Draw an image (2d histogram) of this scan's data to a QPixmap.
+            If overwrite flag is set, this object's picture is replaced
+            with the newest drawing. Otherwise, just return a redrawn copy.
+        """
+
+        histogram_rects = []
+
         w = width
         h = height
         if self._data is None:
-            self._histogram = QPixmap(int(w), int(h))
-            self._histogram.fill(QColor(255, 255, 255))
-            return self._histogram
+            px = QPixmap(int(w), int(h))
+            px.fill(QColor(255, 255, 255))
 
-        self._histogram = QPixmap(int(w), int(h))
-        self._histogram.fill(QColor(255, 255, 255))
-        painter = QPainter(self._histogram)
+            return px, histogram_rects
+
+        px = QPixmap(int(w), int(h))
+        px.fill(QColor(255, 255, 255))
+        painter = QPainter(px)
 
         min_pos = min(self._data['pos'])
         max_pos = max(self._data['pos'])
@@ -107,12 +117,15 @@ class Scan(object):
                 width_fix = 2
                 x_fix = -1
 
-            painter.fillRect(x + x_fix, y, rect_width + width_fix, rect_height + height_fix, brush)
+            rect = (x + x_fix, y, rect_width + width_fix, rect_height + height_fix)
+            histogram_rects.append(rect)
+
+            painter.fillRect(*rect, brush)
 
             prev_x = x
             prev_y = y
 
-        return self._histogram
+        return px, histogram_rects
 
     def time_string(self, fmt='%Y-%m-%d %H:%M:%S'):
         return dt.datetime.strftime(self._time, fmt)
@@ -152,3 +165,7 @@ class Scan(object):
     @title.setter
     def title(self, new_title):
         self._title = new_title
+
+    @property
+    def histogram_rects(self):
+        return self._histogram_rects

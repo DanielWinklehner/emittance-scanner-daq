@@ -1715,24 +1715,6 @@ class DaqView:
             self._daq.current_point_count, self._daq.total_points,
             self._daq.current_point_count / self._daq._total_points))
 
-    def save_scan_image(self):
-        """ Draw a 2D histogram of scan data as a QPixmap and save the output """
-        both = self._window.ui.rbBothScan.isChecked()
-
-        if self._window.ui.rbVScan.isChecked() or both:
-            img = self._current_scan.make_histogram(500, 500)
-            _file = self._scanfile[:-4]
-            if both:
-                _file += '_v'
-            self._window.px.save(_file + '.png', 'png')
-
-        if self._window.ui.rbHScan.isChecked() or both:
-            img = self._current_scan.make_histogram(500, 500)
-            _file = self._scanfile[:-4]
-            if both:
-                _file += '_h'
-            self._window.px.save(_file + '.png', 'png')
-
     def on_one_scan_finished(self, final):
         """ Function called after first scan (vertical) is finished.
             Only relevant during "both" scans
@@ -1746,7 +1728,7 @@ class DaqView:
 
             # and save an image if requested by the user
             if self._window.ui.chkSaveImage.isChecked():
-                img = self._current_scan.make_histogram(500, 500)
+                img = self._current_scan.make_histogram(500, 500)[0]
                 _file = self._scanfile[:-4]
                 if self._window.ui.rbBothScan.isChecked():
                     _file += '_v'
@@ -1773,7 +1755,7 @@ class DaqView:
         self.update_past_scans()
 
         if self._window.ui.chkSaveImage.isChecked():
-            img = self._current_scan.make_histogram(500, 500)
+            img = self._current_scan.make_histogram(500, 500)[0]
             _file = self._scanfile[:-4]
             if self._window.ui.rbBothScan.isChecked():
                 _file += '_v' if self._daq.current_scan_direction == 'Vertical' else '_h'
@@ -1816,7 +1798,7 @@ class DaqView:
             img = QLabel()
             img.resize(100, 100)
             img.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-            img.setPixmap(scan.make_histogram(100, 100))
+            img.setPixmap(scan.make_histogram(100, 100)[0])
 
             ly.addWidget(img)
 
